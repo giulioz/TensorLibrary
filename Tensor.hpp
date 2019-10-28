@@ -21,11 +21,12 @@ static std::vector<size_t> calcStrides(DimensionsList dimensions) {
   std::vector<size_t> strides;
 
   size_t lastStride = 1;
-  strides.push_back(lastStride);
+  strides.emplace(strides.begin(), lastStride);
+  // strides.push_back(lastStride);
 
   for (auto &&dim : dimensions) {
     size_t stride = lastStride * dim;
-    strides.push_back(stride);
+    strides.emplace(strides.begin(), stride);
     lastStride = stride;
   }
 
@@ -52,8 +53,9 @@ class Tensor {
   size_t coordsToIndex(DimensionsList coords) {
     size_t index = 0;
     size_t strideIndex = 0;
+    // size_t size = strides.size();
     for (auto &&coord : coords) {
-      index += coord * strides.at(strideIndex);
+      index += coord * (strides.at(strideIndex));
       strideIndex++;
     }
 
@@ -92,6 +94,13 @@ class Tensor {
       std::cout << data[i] << " ";
     }
     std::cout << std::endl;
+    for (size_t i = 0; i < _totalItems; i++) {
+      std::cout << data[i] << " ";
+    }
+    std::cout << std::endl;
+    for (size_t i = 0; i < strides.size(); i++) {
+      std::cout << strides[i] << " ";
+    }
   }
 };
 
