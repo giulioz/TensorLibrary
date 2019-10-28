@@ -3,8 +3,9 @@
 #include "Tensor.hpp"
 
 int main() {
-  Tensor<int, 2, 3, 3> t;
+  Tensor<int> tensor({5, 2});
+  tensor[{0}] = 10;
 
-  std::cout << "Hello, World!" << std::endl;
+  std::cout << tensor[{0}] << std::endl;
   return 0;
 }
