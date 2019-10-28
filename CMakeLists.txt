@@ -3,4 +3,16 @@ project(tensor-library)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(tensor-library main.cc Tensor.cc)
+add_compile_options(
+  "-Wall" "-Wpedantic" "-Wextra" "-fexceptions"
+  "$<$<CONFIG:DEBUG>:-O0;-g3;-ggdb>"
+)
+
+find_package(Catch2 REQUIRED)
+
+add_executable(tensor-library main.cc Tensor.cc test.cc)
+target_link_libraries(tensor-library Catch2::Catch2)
+
+include(CTest)
+include(Catch)
+catch_discover_tests(tensor-library)
