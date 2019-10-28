@@ -32,17 +32,25 @@ static std::vector<size_t> calcStrides(DimensionsList dimensions) {
 }
 
 template <typename ValueType>
+class TensorIterator {};
+
+template <typename ValueType>
 class Tensor {
   std::unique_ptr<ValueType> data;
   std::vector<size_t> strides;
+  std::vector<size_t> sizes;
 
  public:
-  Tensor(DimensionsList dimensions)
-      : data(new ValueType[calcDataSize(dimensions)]) {
-    strides = calcStrides(dimensions);
+  Tensor(DimensionsList sizes) : data(new ValueType[calcDataSize(sizes)]) {
+    this->sizes = sizes;
+    strides = calcStrides(sizes);
   }
 
-  // initData(default)
+  TensorIterator<ValueType> begin() {}
+
+  void initData(ValueType defaultValue) {
+    std::fill(begin(), begin() + 10, 'r');
+  }
 
   ValueType &operator[](DimensionsList coords) {
     size_t index = 0;
