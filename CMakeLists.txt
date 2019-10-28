@@ -11,7 +11,7 @@ add_compile_options(
 find_package(Catch2 REQUIRED)
 
 add_executable(tensor-library main.cc Tensor.cc test.cc)
-target_link_libraries(tensor-library Catch2::Catch2)
+target_link_libraries(tensor-library Catch2::Catch2 stdc++)
 
 include(CTest)
 include(Catch)

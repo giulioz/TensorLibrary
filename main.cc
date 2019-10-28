@@ -31,7 +31,9 @@ int main() {
   std::cout << "0,3: " << tensor[{0, 3}] << std::endl;
   std::cout << "1,2: " << tensor[{1, 2}] << std::endl;
 
-  // tensor.fill(666);
+  std::fill(tensor.begin(), tensor.end(), 69);
+  tensor.printTensor();
+
   auto iteratorFill = tensor.begin();
   while (iteratorFill < tensor.end()) {
     *iteratorFill = 666;

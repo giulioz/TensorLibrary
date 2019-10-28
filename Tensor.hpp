@@ -1,7 +1,6 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
-#include <algorithm>
 #include <functional>
 #include <initializer_list>
 #include <iostream>
@@ -35,7 +34,7 @@ class Tensor {
  public:
   template <typename ValueTypeIter>
   class TensorIterator
-      : public std::iterator<std::random_access_iterator_tag, ValueTypeIter> {
+      : public std::iterator<std::random_access_iterator_tag, ValueTypeIter, int> {
     friend class Tensor;
     Tensor* tensor;
     size_t currentPos;
@@ -48,8 +47,15 @@ class Tensor {
         typename std::iterator<std::random_access_iterator_tag,
                                ValueTypeIter>::difference_type;
 
-    TensorIterator(Tensor *tensor, size_t startPos = 0)
+    TensorIterator(Tensor* tensor, size_t startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
+
+      /*
+      TensorIterator(Tensor* tensor, DimensionsList fixed ,size_t startPos = 0)
+        : tensor(tensor), currentPos(startPos) {}
+
+        iterators: the class must provide random-access iterators to the full content of the tensor or to the content along any one index, keeping the other indices fixed
+      */
 
    public:
     TensorIterator& operator=(const TensorIterator<ValueTypeIter>& other) {
@@ -162,7 +168,6 @@ class Tensor {
   }
 
   size_t totalItems() const { return _totalItems; }
-
   size_t items(size_t dimension) const { return sizes.at(dimension); }
 
   iterator begin() { return iterator(this); }
@@ -172,13 +177,7 @@ class Tensor {
   const_iterator end() const { return const_iterator(this, _totalItems); }
   const_iterator cend() const { return const_iterator(this, _totalItems); }
 
-  void fill(ValueType defaultValue) {
-    std::fill(begin(), end(), defaultValue);
-  }
-
-  ValueType& operator[](int linearCoord) {
-    return data.at(linearCoord);
-  }
+  ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
 
   ValueType& operator[](DimensionsList coords) {
     auto index = coordsToIndex(coords);
