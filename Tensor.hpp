@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <functional>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
 #include <numeric>
 #include <tuple>
@@ -81,7 +82,17 @@ class Tensor {
     return data.at(index);
   }
 
-  void printTensor() const {}
+  void printTensor() const {
+    for (size_t i = 0; i < _totalItems; i++) {
+      for (size_t j = 0; j < sizes.size(); j++) {
+        if (i % sizes.size() == 0 && i != 0) {
+          std::cout << std::endl;
+        }
+      }
+      std::cout << data[i] << " ";
+    }
+    std::cout << std::endl;
+  }
 };
 
 #endif
