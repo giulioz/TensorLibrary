@@ -11,7 +11,7 @@
 
 using DimensionsList = const std::initializer_list<size_t> &;
 
-static size_t calcDataSize(const std::initializer_list<size_t> &dimensions) {
+static size_t calcDataSize(DimensionsList dimensions) {
   return std::accumulate(std::begin(dimensions), std::end(dimensions), 1,
                          std::multiplies<double>());
 }
@@ -32,35 +32,53 @@ static std::vector<size_t> calcStrides(DimensionsList dimensions) {
 }
 
 template <typename ValueType>
-class TensorIterator {};
+class TensorIterator {
+  size_t currentPos;
+
+ public:
+  TensorIterator(size_t startPos = 0) : currentPos(startPos) {}
+
+  void operator++() { currentPos++; }
+};
 
 template <typename ValueType>
 class Tensor {
-  std::unique_ptr<ValueType> data;
+  std::vector<ValueType> data;
   std::vector<size_t> strides;
   std::vector<size_t> sizes;
+  size_t _totalItems;
+
+  size_t coordsToIndex(DimensionsList coords) {
+    size_t index = 0;
+    size_t strideIndex = 0;
+    for (auto &&coord : coords) {
+      index += coord * strides.at(strideIndex);
+      strideIndex++;
+    }
+
+    return index;
+  }
 
  public:
-  Tensor(DimensionsList sizes) : data(new ValueType[calcDataSize(sizes)]) {
+  Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {
     this->sizes = sizes;
+    _totalItems = data.size();
     strides = calcStrides(sizes);
   }
+
+  size_t totalItems() const { return _totalItems; }
+
+  size_t items(size_t dimension) const { return sizes.at(dimension); }
 
   TensorIterator<ValueType> begin() {}
 
   void initData(ValueType defaultValue) {
-    std::fill(begin(), begin() + 10, 'r');
+    // std::fill(begin(), end(), defaultValue);
   }
 
   ValueType &operator[](DimensionsList coords) {
-    size_t index = 0;
-    size_t strideIndex = 0;
-    for (auto &&coord : coords) {
-      index += coord * strides[strideIndex];
-      strideIndex++;
-    }
-
-    return data.get()[index];
+    auto index = coordsToIndex(coords);
+    return data.at(index);
   }
 
   void printTensor() const {}
