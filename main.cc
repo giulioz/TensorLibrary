@@ -21,10 +21,13 @@ int main() {
   tensor[{1, 1, 1}] = 211;
   tensor[{1, 2, 1}] = 311;
   tensor[{1, 3, 1}] = 411;
-  
+
   auto iterator = tensor.begin();
   iterator++;
   std::cout << "Iteratore: " << *iterator << std::endl;
+  auto iterator2 = tensor.begin(0);
+  iterator2++;
+  std::cout << "Iteratore Fisso: " << *iterator2 << std::endl;
 
   tensor.printTensor();
 
@@ -41,6 +44,8 @@ int main() {
   }
   tensor.printTensor();
 
-  //for example a rank 3 tensor of size (3,4,5) represented in right-major order will have strides (20,5,1) and width (3,4,5). Entry (i,j,k) will be at index (20*i+5*j+k*1) in the flat storage.
+  // for example a rank 3 tensor of size (3,4,5) represented in right-major
+  // order will have strides (20,5,1) and width (3,4,5). Entry (i,j,k) will be at
+  // index (20*i+5*j+k*1) in the flat storage.
   return 0;
 }

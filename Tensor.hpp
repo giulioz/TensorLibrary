@@ -33,8 +33,8 @@ template <typename ValueType>
 class Tensor {
  public:
   template <typename ValueTypeIter>
-  class TensorIterator
-      : public std::iterator<std::random_access_iterator_tag, ValueTypeIter, int> {
+  class TensorIterator : public std::iterator<std::random_access_iterator_tag,
+                                              ValueTypeIter, int> {
     friend class Tensor;
     Tensor* tensor;
     size_t currentPos;
@@ -50,12 +50,14 @@ class Tensor {
     TensorIterator(Tensor* tensor, size_t startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
 
-      /*
-      TensorIterator(Tensor* tensor, DimensionsList fixed ,size_t startPos = 0)
-        : tensor(tensor), currentPos(startPos) {}
+    /*
+    TensorIterator(Tensor* tensor, DimensionsList fixed ,size_t startPos = 0)
+      : tensor(tensor), currentPos(startPos) {}
 
-        iterators: the class must provide random-access iterators to the full content of the tensor or to the content along any one index, keeping the other indices fixed
-      */
+      iterators: the class must provide random-access iterators to the full
+    content of the tensor or to the content along any one index, keeping the
+    other indices fixed
+    */
 
    public:
     TensorIterator& operator=(const TensorIterator<ValueTypeIter>& other) {
@@ -140,6 +142,124 @@ class Tensor {
     }
   };
 
+  template <typename ValueTypeIter>
+  class TensorIteratorFixed
+      : public std::iterator<std::random_access_iterator_tag, ValueTypeIter,
+                             int> {
+    friend class Tensor;
+    Tensor* tensor;
+    size_t currentPos;
+    size_t stride;
+    // size_t width; ?
+
+    using pointer = typename std::iterator<std::random_access_iterator_tag,
+                                           ValueTypeIter>::pointer;
+    using reference = typename std::iterator<std::random_access_iterator_tag,
+                                             ValueTypeIter>::reference;
+    using difference_type =
+        typename std::iterator<std::random_access_iterator_tag,
+                               ValueTypeIter>::difference_type;
+
+    TensorIteratorFixed(Tensor* tensor, size_t fixedIndex, size_t startPos = 0)
+        : tensor(tensor),
+          currentPos(startPos),
+          stride(tensor.strides[fixedIndex]) {}
+
+    /*
+    TensorIteratorFixed(Tensor* tensor, DimensionsList fixed ,size_t startPos =
+    0) : tensor(tensor), currentPos(startPos) {}
+
+      iterators: the class must provide random-access iterators to the full
+    content of the tensor or to the content along any one index, keeping the
+    other indices fixed
+    */
+
+   public:
+    TensorIteratorFixed& operator=(
+        const TensorIteratorFixed<ValueTypeIter>& other) {
+      currentPos = other.currentPos;
+      return *this;
+    }
+
+    reference operator*() const { return (*tensor)[currentPos]; }
+
+    pointer operator->() const { return &((*tensor)[currentPos]); }
+
+    TensorIteratorFixed& operator++() {
+      currentPos += stride;
+      return *this;
+    }
+
+    TensorIteratorFixed& operator--() {
+      currentPos -= stride;
+      return *this;
+    }
+
+    TensorIteratorFixed operator++(int) {
+      currentPos += stride;
+      return TensorIteratorFixed(tensor, currentPos - stride);
+    }
+
+    TensorIteratorFixed operator--(int) {
+      currentPos -= stride;
+      return TensorIteratorFixed(tensor, currentPos + stride);
+    }
+
+    TensorIteratorFixed operator+(const difference_type& n) const {
+      return TensorIteratorFixed(tensor, (currentPos + (n * stride)));
+    }
+
+    TensorIteratorFixed& operator+=(const difference_type& n) {
+      currentPos += (n * stride);
+      return *this;
+    }
+
+    TensorIteratorFixed operator-(const difference_type& n) const {
+      return TensorIteratorFixed(tensor, (currentPos - (n * stride)));
+    }
+
+    TensorIteratorFixed& operator-=(const difference_type& n) {
+      currentPos -= (n * stride);
+      return *this;
+    }
+
+    reference operator[](const difference_type& n) const {
+      return (*tensor)[currentPos + (n * stride)];
+    }
+
+    bool operator==(const TensorIteratorFixed& other) const {
+      return currentPos == other.currentPos;
+    }
+
+    bool operator!=(const TensorIteratorFixed& other) const {
+      return currentPos != other.currentPos;
+    }
+
+    bool operator<(const TensorIteratorFixed& other) const {
+      return currentPos < other.currentPos;
+    }
+
+    bool operator>(const TensorIteratorFixed& other) const {
+      return currentPos > other.currentPos;
+    }
+
+    bool operator<=(const TensorIteratorFixed& other) const {
+      return currentPos <= other.currentPos;
+    }
+
+    bool operator>=(const TensorIteratorFixed& other) const {
+      return currentPos >= other.currentPos;
+    }
+
+    difference_type operator+(const TensorIteratorFixed& other) const {
+      return currentPos + other.currentPos;
+    }
+
+    difference_type operator-(const TensorIteratorFixed& other) const {
+      return currentPos - other.currentPos;
+    }
+  };
+
  private:
   std::vector<ValueType> data;
   std::vector<size_t> strides;
@@ -161,6 +281,9 @@ class Tensor {
   using iterator = TensorIterator<ValueType>;
   using const_iterator = TensorIterator<const ValueType>;
 
+  using iteratorFixed = TensorIteratorFixed<ValueType>;
+  using const_iteratorFixed = TensorIteratorFixed<const ValueType>;
+
   Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {
     this->sizes = sizes;
     _totalItems = data.size();
@@ -176,6 +299,23 @@ class Tensor {
   iterator end() { return iterator(this, _totalItems); }
   const_iterator end() const { return const_iterator(this, _totalItems); }
   const_iterator cend() const { return const_iterator(this, _totalItems); }
+
+  iteratorFixed begin(fixedIndex) { return iterator(this, fixedIndex); }
+  const_iteratorFixed begin(fixedIndex) const {
+    return const_iterator(this, fixedIndex);
+  }
+  const_iteratorFixed cbegin(fixedIndex) const {
+    return const_iterator(this, fixedIndex);
+  }
+  iteratorFixed end(fixedIndex) {
+    return iterator(this, fixedIndex, _totalItems);
+  }
+  const_iteratorFixed end(fixedIndex) const {
+    return const_iterator(this, fixedIndex, _totalItems);
+  }
+  const_iteratorFixed cend(fixedIndex) const {
+    return const_iterator(this, fixedIndex, _totalItems);
+  }
 
   ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
 
