@@ -163,7 +163,7 @@ class Tensor {
     TensorIteratorFixed(Tensor* tensor, size_t fixedIndex, size_t startPos = 0)
         : tensor(tensor),
           currentPos(startPos),
-          stride(tensor.strides[fixedIndex]) {}
+          stride(tensor->strides[fixedIndex]) {}
 
     /*
     TensorIteratorFixed(Tensor* tensor, DimensionsList fixed ,size_t startPos =
@@ -300,21 +300,23 @@ class Tensor {
   const_iterator end() const { return const_iterator(this, _totalItems); }
   const_iterator cend() const { return const_iterator(this, _totalItems); }
 
-  iteratorFixed begin(fixedIndex) { return iterator(this, fixedIndex); }
-  const_iteratorFixed begin(fixedIndex) const {
-    return const_iterator(this, fixedIndex);
+  iteratorFixed begin(size_t fixedIndex) {
+    return iteratorFixed(this, fixedIndex);
   }
-  const_iteratorFixed cbegin(fixedIndex) const {
-    return const_iterator(this, fixedIndex);
+  const_iteratorFixed begin(size_t fixedIndex) const {
+    return const_iteratorFixed(this, fixedIndex);
   }
-  iteratorFixed end(fixedIndex) {
-    return iterator(this, fixedIndex, _totalItems);
+  const_iteratorFixed cbegin(size_t fixedIndex) const {
+    return const_iteratorFixed(this, fixedIndex);
   }
-  const_iteratorFixed end(fixedIndex) const {
-    return const_iterator(this, fixedIndex, _totalItems);
+  iteratorFixed end(size_t fixedIndex) {
+    return iteratorFixed(this, fixedIndex, _totalItems);
   }
-  const_iteratorFixed cend(fixedIndex) const {
-    return const_iterator(this, fixedIndex, _totalItems);
+  const_iteratorFixed end(size_t fixedIndex) const {
+    return const_iteratorFixed(this, fixedIndex, _totalItems);
+  }
+  const_iteratorFixed cend(size_t fixedIndex) const {
+    return const_iteratorFixed(this, fixedIndex, _totalItems);
   }
 
   ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
