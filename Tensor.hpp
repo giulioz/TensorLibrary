@@ -11,6 +11,7 @@
 #include <vector>
 
 using DimensionsList = const std::initializer_list<size_t>&;
+using FixedDimensionsList = const std::initializer_list<int>&;
 
 static inline size_t calcDataSize(DimensionsList dimensions) {
   return std::accumulate(std::begin(dimensions), std::end(dimensions), 1,
@@ -27,6 +28,55 @@ static inline std::vector<size_t> calcStrides(DimensionsList dimensions) {
   }
 
   return strides;
+}
+
+static inline size_t findFixedStride(std::vector<size_t> strides,
+                                     FixedDimensionsList indexList) {
+  size_t fixedStride = 0;
+  size_t index = 0;
+  for (auto&& fixedValue : indexList) {
+    if (fixedValue != -1) {
+      fixedStride += fixedValue * strides[index];
+    } else {
+      fixedStride += strides[index];
+    }
+    index++;
+  }
+
+  std::cout << "Fixed " << fixedStride << std::endl;
+  return fixedStride;
+}
+
+static inline size_t findFixedIndex(FixedDimensionsList indexList) {
+  size_t index = 0;
+  for (auto&& fixedValue : indexList) {
+    if (fixedValue == -1) {
+      std::cout << "index " << index << std::endl;
+      return index;
+    }
+    index++;
+  }
+  std::cout << "index " << index << std::endl;
+
+  return index;
+}
+
+static inline size_t findInitialPosition(std::vector<size_t> strides,
+                                         FixedDimensionsList indexList,
+                                         size_t width = 0) {
+  size_t index = 0;
+  size_t position = 0;
+  for (auto&& fixedValue : indexList) {
+    if (fixedValue != -1) {
+      position += fixedValue * strides[index];
+    } else if (width != 0) {
+      position += width * strides[index];
+    }
+    index++;
+  }
+  std::cout << "Initial: " << position << std::endl;
+
+  return position;
 }
 
 template <typename ValueType>
@@ -148,8 +198,8 @@ class Tensor {
                              int> {
     friend class Tensor;
     Tensor* tensor;
+    size_t fixedStride;
     size_t currentPos;
-    size_t stride;
     // size_t width; ?
 
     using pointer = typename std::iterator<std::random_access_iterator_tag,
@@ -160,10 +210,8 @@ class Tensor {
         typename std::iterator<std::random_access_iterator_tag,
                                ValueTypeIter>::difference_type;
 
-    TensorIteratorFixed(Tensor* tensor, size_t fixedIndex, size_t startPos = 0)
-        : tensor(tensor),
-          currentPos(startPos),
-          stride(tensor->strides[fixedIndex]) {}
+    TensorIteratorFixed(Tensor* tensor, size_t fixedStride, size_t startPos)
+        : tensor(tensor), fixedStride(fixedStride), currentPos(startPos) {}
 
     /*
     TensorIteratorFixed(Tensor* tensor, DimensionsList fixed ,size_t startPos =
@@ -186,45 +234,47 @@ class Tensor {
     pointer operator->() const { return &((*tensor)[currentPos]); }
 
     TensorIteratorFixed& operator++() {
-      currentPos += stride;
+      currentPos += fixedStride;
       return *this;
     }
 
     TensorIteratorFixed& operator--() {
-      currentPos -= stride;
+      currentPos -= fixedStride;
       return *this;
     }
 
     TensorIteratorFixed operator++(int) {
-      currentPos += stride;
-      return TensorIteratorFixed(tensor, currentPos - stride);
+      currentPos += fixedStride;
+      return TensorIteratorFixed(tensor, fixedStride, currentPos - fixedStride);
     }
 
     TensorIteratorFixed operator--(int) {
-      currentPos -= stride;
-      return TensorIteratorFixed(tensor, currentPos + stride);
+      currentPos -= fixedStride;
+      return TensorIteratorFixed(tensor, fixedStride, currentPos + fixedStride);
     }
 
     TensorIteratorFixed operator+(const difference_type& n) const {
-      return TensorIteratorFixed(tensor, (currentPos + (n * stride)));
+      return TensorIteratorFixed(tensor, fixedStride,
+                                 (currentPos + (n * fixedStride)));
     }
 
     TensorIteratorFixed& operator+=(const difference_type& n) {
-      currentPos += (n * stride);
+      currentPos += (n * fixedStride);
       return *this;
     }
 
     TensorIteratorFixed operator-(const difference_type& n) const {
-      return TensorIteratorFixed(tensor, (currentPos - (n * stride)));
+      return TensorIteratorFixed(tensor, fixedStride,
+                                 (currentPos - (n * fixedStride)));
     }
 
     TensorIteratorFixed& operator-=(const difference_type& n) {
-      currentPos -= (n * stride);
+      currentPos -= (n * fixedStride);
       return *this;
     }
 
     reference operator[](const difference_type& n) const {
-      return (*tensor)[currentPos + (n * stride)];
+      return (*tensor)[currentPos + (n * fixedStride)];
     }
 
     bool operator==(const TensorIteratorFixed& other) const {
@@ -300,24 +350,28 @@ class Tensor {
   const_iterator end() const { return const_iterator(this, _totalItems); }
   const_iterator cend() const { return const_iterator(this, _totalItems); }
 
-  iteratorFixed begin(size_t fixedIndex) {
-    return iteratorFixed(this, fixedIndex);
+  iteratorFixed begin(FixedDimensionsList indexList) {
+    return iteratorFixed(this, findFixedStride(strides, indexList),
+                         findInitialPosition(strides, indexList));
   }
-  const_iteratorFixed begin(size_t fixedIndex) const {
-    return const_iteratorFixed(this, fixedIndex);
+
+  // const_iteratorFixed begin(size_t& indexArray) const {
+  //   return const_iteratorFixed(this, indexArray);
+  // }
+  // const_iteratorFixed cbegin(size_t& indexArray) const {
+  //   return const_iteratorFixed(this, indexArray);
+  // }
+  iteratorFixed end(FixedDimensionsList indexList) {
+    return iteratorFixed(this, findFixedStride(strides, indexList),
+                         findInitialPosition(strides, indexList,
+                                             sizes[findFixedIndex(indexList)]));
   }
-  const_iteratorFixed cbegin(size_t fixedIndex) const {
-    return const_iteratorFixed(this, fixedIndex);
-  }
-  iteratorFixed end(size_t fixedIndex) {
-    return iteratorFixed(this, fixedIndex, _totalItems);
-  }
-  const_iteratorFixed end(size_t fixedIndex) const {
-    return const_iteratorFixed(this, fixedIndex, _totalItems);
-  }
-  const_iteratorFixed cend(size_t fixedIndex) const {
-    return const_iteratorFixed(this, fixedIndex, _totalItems);
-  }
+  // const_iteratorFixed end(size_t& indexArray) const {
+  //   return const_iteratorFixed(this, indexArray, sizes[indexArray]);
+  // }
+  // const_iteratorFixed cend(size_t& indexArray) const {
+  //   return const_iteratorFixed(this, indexArray, sizes[indexArray]);
+  // }
 
   ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
 
@@ -345,6 +399,11 @@ class Tensor {
     std::cout << std::endl << "Strides" << std::endl;
     for (size_t i = 0; i < strides.size(); i++) {
       std::cout << strides[i] << " ";
+    }
+
+    std::cout << std::endl << "Sizes" << std::endl;
+    for (size_t i = 0; i < sizes.size(); i++) {
+      std::cout << sizes[i] << " ";
     }
 
     std::cout << std::endl;
