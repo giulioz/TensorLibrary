@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+const int VARIABLE_INDEX = -1;
+
 using DimensionsList = const std::initializer_list<size_t>&;
 using FixedDimensionsList = const std::initializer_list<int>&;
 
@@ -35,7 +37,7 @@ static inline size_t findFixedStride(std::vector<size_t> strides,
   size_t fixedStride = 0;
   size_t index = 0;
   for (auto&& fixedValue : indexList) {
-    if (fixedValue != -1) {
+    if (fixedValue != VARIABLE_INDEX) {
       fixedStride += fixedValue * strides[index];
     } else {
       fixedStride += strides[index];
@@ -49,7 +51,7 @@ static inline size_t findFixedStride(std::vector<size_t> strides,
 static inline size_t findFixedIndex(FixedDimensionsList indexList) {
   size_t index = 0;
   for (auto&& fixedValue : indexList) {
-    if (fixedValue == -1) {
+    if (fixedValue == VARIABLE_INDEX) {
       return index;
     }
     index++;
@@ -64,7 +66,7 @@ static inline size_t findInitialPosition(std::vector<size_t> strides,
   size_t index = 0;
   size_t position = 0;
   for (auto&& fixedValue : indexList) {
-    if (fixedValue != -1) {
+    if (fixedValue != VARIABLE_INDEX) {
       position += fixedValue * strides[index];
     } else if (width != 0) {
       position += width * strides[index];
@@ -188,7 +190,7 @@ class Tensor {
     size_t fixedStride;
     size_t currentPos;
 
-    using pointer = typename std::iterator<std::random_access_iterator_tag,
+        using pointer = typename std::iterator<std::random_access_iterator_tag,
                                            ValueTypeIter>::pointer;
     using reference = typename std::iterator<std::random_access_iterator_tag,
                                              ValueTypeIter>::reference;

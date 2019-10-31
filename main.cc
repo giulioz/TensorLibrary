@@ -30,9 +30,9 @@ int main() {
   }
   std::cout << std::endl;
 
-  auto iteratorFixed = tensor.begin({0, 0, -1});
+  auto iteratorFixed = tensor.begin({0, 0, VARIABLE_INDEX});
   std::cout << "Iteratore Fisso: " << std::endl;
-  auto end = tensor.end({0, 0, -1});
+  auto end = tensor.end({0, 0, VARIABLE_INDEX});
   while (iteratorFixed < end) {
     std::cout << *iteratorFixed << ", ";
     iteratorFixed++;
