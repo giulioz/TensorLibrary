@@ -30,16 +30,6 @@ int main() {
   }
   std::cout << std::endl;
 
-  // for (size_t index = 0; index < 3; index++) {
-  //   auto iteratorFixed = tensor.begin(index);
-  //   std::cout << "Iteratore Fisso " << index << ": " << std::endl;
-  //   while (iteratorFixed < tensor.end(index)) {
-  //     std::cout << *iteratorFixed << ", ";
-  //     iteratorFixed++;
-  //   }
-  //   std::cout << std::endl;
-  // }
-
   auto iteratorFixed = tensor.begin({0, 0, -1});
   std::cout << "Iteratore Fisso: " << std::endl;
   auto end = tensor.end({0, 0, -1});

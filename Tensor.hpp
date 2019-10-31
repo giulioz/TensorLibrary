@@ -43,7 +43,6 @@ static inline size_t findFixedStride(std::vector<size_t> strides,
     index++;
   }
 
-  std::cout << "Fixed " << fixedStride << std::endl;
   return fixedStride;
 }
 
@@ -51,12 +50,10 @@ static inline size_t findFixedIndex(FixedDimensionsList indexList) {
   size_t index = 0;
   for (auto&& fixedValue : indexList) {
     if (fixedValue == -1) {
-      std::cout << "index " << index << std::endl;
       return index;
     }
     index++;
   }
-  std::cout << "index " << index << std::endl;
 
   return index;
 }
@@ -74,7 +71,6 @@ static inline size_t findInitialPosition(std::vector<size_t> strides,
     }
     index++;
   }
-  std::cout << "Initial: " << position << std::endl;
 
   return position;
 }
@@ -99,15 +95,6 @@ class Tensor {
 
     TensorIterator(Tensor* tensor, size_t startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
-
-    /*
-    TensorIterator(Tensor* tensor, DimensionsList fixed ,size_t startPos = 0)
-      : tensor(tensor), currentPos(startPos) {}
-
-      iterators: the class must provide random-access iterators to the full
-    content of the tensor or to the content along any one index, keeping the
-    other indices fixed
-    */
 
    public:
     TensorIterator& operator=(const TensorIterator<ValueTypeIter>& other) {
@@ -200,7 +187,6 @@ class Tensor {
     Tensor* tensor;
     size_t fixedStride;
     size_t currentPos;
-    // size_t width; ?
 
     using pointer = typename std::iterator<std::random_access_iterator_tag,
                                            ValueTypeIter>::pointer;
@@ -212,15 +198,6 @@ class Tensor {
 
     TensorIteratorFixed(Tensor* tensor, size_t fixedStride, size_t startPos)
         : tensor(tensor), fixedStride(fixedStride), currentPos(startPos) {}
-
-    /*
-    TensorIteratorFixed(Tensor* tensor, DimensionsList fixed ,size_t startPos =
-    0) : tensor(tensor), currentPos(startPos) {}
-
-      iterators: the class must provide random-access iterators to the full
-    content of the tensor or to the content along any one index, keeping the
-    other indices fixed
-    */
 
    public:
     TensorIteratorFixed& operator=(
@@ -355,23 +332,31 @@ class Tensor {
                          findInitialPosition(strides, indexList));
   }
 
-  // const_iteratorFixed begin(size_t& indexArray) const {
-  //   return const_iteratorFixed(this, indexArray);
-  // }
-  // const_iteratorFixed cbegin(size_t& indexArray) const {
-  //   return const_iteratorFixed(this, indexArray);
-  // }
+  const_iteratorFixed begin(FixedDimensionsList indexList) const {
+    return const_iteratorFixed(this, findFixedStride(strides, indexList),
+                               findInitialPosition(strides, indexList));
+  }
+  const_iteratorFixed cbegin(FixedDimensionsList indexList) const {
+    return const_iteratorFixed(this, findFixedStride(strides, indexList),
+                               findInitialPosition(strides, indexList));
+  }
   iteratorFixed end(FixedDimensionsList indexList) {
     return iteratorFixed(this, findFixedStride(strides, indexList),
                          findInitialPosition(strides, indexList,
                                              sizes[findFixedIndex(indexList)]));
   }
-  // const_iteratorFixed end(size_t& indexArray) const {
-  //   return const_iteratorFixed(this, indexArray, sizes[indexArray]);
-  // }
-  // const_iteratorFixed cend(size_t& indexArray) const {
-  //   return const_iteratorFixed(this, indexArray, sizes[indexArray]);
-  // }
+  const_iteratorFixed end(FixedDimensionsList indexList) const {
+    return const_iteratorFixed(
+        this, findFixedStride(strides, indexList),
+        findInitialPosition(strides, indexList,
+                            sizes[findFixedIndex(indexList)]));
+  }
+  const_iteratorFixed cend(FixedDimensionsList indexList) const {
+    return const_iteratorFixed(
+        this, findFixedStride(strides, indexList),
+        findInitialPosition(strides, indexList,
+                            sizes[findFixedIndex(indexList)]));
+  }
 
   ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
 
