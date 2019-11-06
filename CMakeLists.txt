@@ -8,5 +8,5 @@ add_compile_options(
   "$<$<CONFIG:DEBUG>:-O0;-g3;-ggdb>"
 )
 
-add_executable(tensor-library main.cc Tensor.cc test.cc)
+add_executable(tensor-library main.cc Tensor.cc)
 target_link_libraries(tensor-library stdc++)
