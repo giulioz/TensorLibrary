@@ -8,11 +8,5 @@ add_compile_options(
   "$<$<CONFIG:DEBUG>:-O0;-g3;-ggdb>"
 )
 
-find_package(Catch2 REQUIRED)
-
 add_executable(tensor-library main.cc Tensor.cc test.cc)
-target_link_libraries(tensor-library Catch2::Catch2 stdc++)
-
-include(CTest)
-include(Catch)
-catch_discover_tests(tensor-library)
+target_link_libraries(tensor-library stdc++)
