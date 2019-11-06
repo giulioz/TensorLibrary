@@ -2,6 +2,18 @@
 
 #include "Tensor.hpp"
 
+template <class TensorType>
+void printTensor(TensorType& t) {
+  auto iterator = t.begin();
+  
+  std::cout << std::endl << "Data:" << std::endl;
+  for (; iterator < t.end(); iterator++) {
+    std::cout << *iterator << ", ";
+  }
+
+  std::cout << std::endl;
+}
+
 int main() {
   Tensor<int> tensor({2, 4, 2});
 
@@ -30,29 +42,30 @@ int main() {
   }
   std::cout << std::endl;
 
-  auto iteratorFixed = tensor.begin({0, 0, VARIABLE_INDEX});
-  std::cout << "Iteratore Fisso: " << std::endl;
-  auto end = tensor.end({0, 0, VARIABLE_INDEX});
-  while (iteratorFixed < end) {
-    std::cout << *iteratorFixed << ", ";
-    iteratorFixed++;
-  }
-  std::cout << std::endl;
+  // auto iteratorFixed = tensor.begin({0, 0, VARIABLE_INDEX});
+  // std::cout << "Iteratore Fisso: " << std::endl;
+  // auto end = tensor.end({0, 0, VARIABLE_INDEX});
+  // while (iteratorFixed < end) {
+  //   std::cout << *iteratorFixed << ", ";
+  //   iteratorFixed++;
+  // }
+  // std::cout << std::endl;
 
-  // tensor.printTensor();
+  // printTensor(tensor);
 
   // std::cout << "0,3: " << tensor[{0, 3}] << std::endl;
   // std::cout << "1,2: " << tensor[{1, 2}] << std::endl;
 
-  // std::fill(tensor.begin(), tensor.end(), 69);
-  // tensor.printTensor();
+  std::fill(tensor.begin(), tensor.end(), 69);
+  // printTensor(tensor);
 
   // auto iteratorFill = tensor.begin();
   // while (iteratorFill < tensor.end()) {
   //   *iteratorFill = 666;
   //   iteratorFill++;
   // }
-  tensor.printTensor();
+
+  printTensor(tensor);
 
   // for example a rank 3 tensor of size (3,4,5) represented in right-major
   // order will have strides (20,5,1) and width (3,4,5). Entry (i,j,k) will be
