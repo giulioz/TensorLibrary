@@ -93,11 +93,11 @@ class Tensor {
         typename std::iterator<std::random_access_iterator_tag,
                                ValueType>::difference_type;
 
-    using iterator_category = std::random_access_iterator_tag;
+    using iterator_category = typename std::random_access_iterator_tag;
 
    private:
     // Instance variables
-    Tensor<ValueType> tensor;
+    Tensor<ValueType> &tensor;
     size_t currentPos;
 
     TensorIterator(Tensor<ValueType>& tensor, size_t startPos = 0)
@@ -115,13 +115,17 @@ class Tensor {
 
     reference operator*() { return tensor[currentPos]; }
 
-    pointer operator->() const { return &(tensor[currentPos]); }
+    pointer operator->() { return &tensor[currentPos]; }
 
-    reference operator[](const difference_type& n) const {
-      return tensor[currentPos + n];
+    reference operator[](const difference_type& n) {
+      return tensor[n];
     }
 
-#pragma region Move Operators
+    reference operator[](DimensionsList& coords) {
+      return tensor[tensor.coordsToIndex(coords)];
+    }
+
+#pragma region Seek Operators
 
     TensorIterator& operator++() {
       currentPos++;
@@ -199,7 +203,7 @@ class Tensor {
   };
 
  private:
-  using ArrayType = std::vector<ValueType>;
+  using ArrayType = typename std::vector<ValueType>;
 
   ArrayType data;
   std::vector<size_t> strides;
@@ -224,15 +228,27 @@ class Tensor {
     strides = calcStrides(sizes);
   }
 
+  Tensor(const Tensor& other)
+      : data(other.data),
+        strides(other.strides),
+        sizes(other.sizes),
+        _totalItems(other._totalItems) {}
+
+  // Tensor& operator=(const Tensor& other) {
+  //   return *this;
+  // }
+
   size_t totalItems() const { return _totalItems; }
   size_t itemsAt(size_t dimension) const { return sizes.at(dimension); }
 
   TensorIterator begin() { return TensorIterator(*this); }
   TensorIterator end() { return TensorIterator(*this, _totalItems); }
 
-  ValueType& operator[](int linearCoord) { return data.at(linearCoord); }
+  ValueType& operator[](const size_t linearCoord) {
+    return data.at(linearCoord);
+  }
 
-  ValueType& operator[](DimensionsList coords) {
+  ValueType& operator[](DimensionsList& coords) {
     auto index = coordsToIndex(coords);
     return data.at(index);
   }

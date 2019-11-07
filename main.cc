@@ -4,10 +4,7 @@
 
 template <class TensorType>
 void printTensor(TensorType& t) {
-  auto iterator = t.begin();
-  
-  std::cout << std::endl << "Data:" << std::endl;
-  for (; iterator < t.end(); iterator++) {
+  for (auto iterator = t.begin(); iterator < t.end(); iterator++) {
     std::cout << *iterator << ", ";
   }
 
@@ -34,8 +31,8 @@ int main() {
   tensor[{1, 2, 1}] = 232;
   tensor[{1, 3, 1}] = 242;
 
+  std::cout << "Iterator read test: " << std::endl;
   auto iterator = tensor.begin();
-  std::cout << "Iteratore: " << std::endl;
   while (iterator < tensor.end()) {
     std::cout << *iterator << ", ";
     iterator++;
@@ -56,19 +53,25 @@ int main() {
   // std::cout << "0,3: " << tensor[{0, 3}] << std::endl;
   // std::cout << "1,2: " << tensor[{1, 2}] << std::endl;
 
-  std::fill(tensor.begin(), tensor.end(), 69);
-  // printTensor(tensor);
+  std::cout << std::endl;
 
-  // auto iteratorFill = tensor.begin();
-  // while (iteratorFill < tensor.end()) {
-  //   *iteratorFill = 666;
-  //   iteratorFill++;
-  // }
-
+  std::cout << "Write test: ";
+  tensor[0] = 42;
+  tensor[{1,0,0}] = 43;
+  tensor.begin()[2] = 44;
+  tensor.begin()[{3,0,0}] = 45;
   printTensor(tensor);
+  std::cout << std::endl;
 
-  // for example a rank 3 tensor of size (3,4,5) represented in right-major
-  // order will have strides (20,5,1) and width (3,4,5). Entry (i,j,k) will be
-  // at index (20*i+5*j+k*1) in the flat storage.
+  std::cout << "Copy test: " << std::endl;
+  Tensor<int> tensor2 = tensor;
+  tensor.begin()[0] = 42;
+  tensor.begin()[0] = 43;
+  std::fill(tensor.begin(), tensor.end(), 42);
+  std::cout << "Tensor1: ";
+  printTensor(tensor);
+  std::cout << "Tensor2: ";
+  printTensor(tensor2);
+
   return 0;
 }
