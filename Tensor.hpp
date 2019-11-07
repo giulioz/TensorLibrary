@@ -101,17 +101,26 @@ struct IteratorTypeConst {
   }
 };
 
+struct IteratorIndexerLinear {
+  using IndexType = size_t;
+
+  static size_t getLinearIndex(IndexType pos) { return pos; }
+};
+
 template <typename ValueType>
 class Tensor {
  public:
-  template <typename ITType = IteratorTypeStandard<ValueType>>
+  template <typename ITType = IteratorTypeStandard<ValueType>,
+            typename ITIndexer = IteratorIndexerLinear>
   class Iterator : public std::iterator<std::random_access_iterator_tag,
                                         typename ITType::ValueType> {
     friend class Tensor;
 
    public:
-    using pointer = typename std::iterator<std::random_access_iterator_tag,
-                                           typename ITType::ValueType>::pointer;
+    using pointer =
+        typename std::iterator<std::random_access_iterator_tag,
+                               typename ITType::ValueType,
+                               typename ITIndexer::IndexType>::pointer;
     using reference =
         typename std::iterator<std::random_access_iterator_tag,
                                typename ITType::ValueType>::reference;
@@ -123,9 +132,10 @@ class Tensor {
 
    private:
     typename ITType::InternalTensorRef tensor;
-    size_t currentPos;
+    typename ITIndexer::IndexType currentPos;
 
-    Iterator(typename ITType::InternalTensorRef tensor, size_t startPos = 0)
+    Iterator(typename ITType::InternalTensorRef tensor,
+             typename ITIndexer::IndexType startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
 
    public:
@@ -135,17 +145,18 @@ class Tensor {
     Iterator(const Iterator&& move)
         : tensor(move.tensor), currentPos(move.currentPos) {}
 
-    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
-
-    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
-
-    auto& operator[](const difference_type& n) {
-      return ITType::getElementRef(tensor, n);
+    auto& operator*() {
+      return ITType::getElementRef(tensor,
+                                   ITIndexer::getLinearIndex(currentPos));
     }
 
-    auto& operator[](DimensionsList& coords) {
-      auto index = tensor.coordsToIndex(coords);
-      return ITType::getElementRef(tensor, index);
+    auto& operator-> () {
+      return &ITType::getElementRef(tensor,
+                                    ITIndexer::getLinearIndex(currentPos));
+    }
+
+    auto& operator[](const difference_type& n) {
+      return ITType::getElementRef(tensor, ITIndexer::getLinearIndex(n));
     }
 
 #pragma region Seek Operators

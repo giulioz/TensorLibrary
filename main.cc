@@ -61,7 +61,6 @@ int main() {
   tensor[0] = 42;
   tensor[{1,0,0}] = 43;
   tensor.begin()[2] = 44;
-  tensor.begin()[{3,0,0}] = 45;
   printTensor(tensor);
   std::cout << std::endl;
 
