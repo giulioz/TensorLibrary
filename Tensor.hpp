@@ -9,6 +9,8 @@
 #include <tuple>
 #include <vector>
 
+namespace TensorLib {
+
 const static int VARIABLE_INDEX = -1;
 
 using DimensionsList = const std::initializer_list<size_t>&;
@@ -31,7 +33,7 @@ static inline std::vector<size_t> calcStrides(DimensionsList dimensions) {
   return strides;
 }
 
-static inline size_t findFixedStride(std::vector<size_t> strides,
+static inline size_t findFixedStride(const std::vector<size_t> strides,
                                      FixedDimensionsList indexList) {
   size_t fixedStride = 0;
   size_t index = 0;
@@ -59,9 +61,9 @@ static inline size_t findFixedIndex(FixedDimensionsList indexList) {
   return index;
 }
 
-static inline size_t findInitialPosition(std::vector<size_t> strides,
+static inline size_t findInitialPosition(const std::vector<size_t> strides,
                                          FixedDimensionsList indexList,
-                                         size_t width = 0) {
+                                         const size_t width = 0) {
   size_t index = 0;
   size_t position = 0;
   for (auto&& fixedValue : indexList) {
@@ -77,90 +79,111 @@ static inline size_t findInitialPosition(std::vector<size_t> strides,
 }
 
 template <typename ValueType>
+class Tensor;
+
+template <typename ITValueType>
+struct IteratorTypeStandard {
+  using ValueType = ITValueType;
+  using InternalTensorRef = Tensor<ValueType>&;
+
+  static ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
+    return tensor.at(pos);
+  }
+};
+
+template <typename ITValueType>
+struct IteratorTypeConst {
+  using ValueType = ITValueType;
+  using InternalTensorRef = const Tensor<ValueType>&;
+
+  static const ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
+    return tensor.c_at(pos);
+  }
+};
+
+template <typename ValueType>
 class Tensor {
  public:
-  class TensorIterator
-      : public std::iterator<std::random_access_iterator_tag, ValueType> {
+  template <typename ITType = IteratorTypeStandard<ValueType>>
+  class Iterator : public std::iterator<std::random_access_iterator_tag,
+                                        typename ITType::ValueType> {
     friend class Tensor;
 
    public:
-    // Instance types
     using pointer = typename std::iterator<std::random_access_iterator_tag,
-                                           ValueType>::pointer;
-    using reference = typename std::iterator<std::random_access_iterator_tag,
-                                             ValueType>::reference;
+                                           typename ITType::ValueType>::pointer;
+    using reference =
+        typename std::iterator<std::random_access_iterator_tag,
+                               typename ITType::ValueType>::reference;
     using difference_type =
         typename std::iterator<std::random_access_iterator_tag,
-                               ValueType>::difference_type;
+                               typename ITType::ValueType>::difference_type;
 
     using iterator_category = typename std::random_access_iterator_tag;
 
    private:
-    // Instance variables
-    Tensor<ValueType> &tensor;
+    typename ITType::InternalTensorRef tensor;
     size_t currentPos;
 
-    TensorIterator(Tensor<ValueType>& tensor, size_t startPos = 0)
+    Iterator(typename ITType::InternalTensorRef tensor, size_t startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
 
    public:
-    TensorIterator(const TensorIterator& copy)
+    Iterator(const Iterator& copy)
         : tensor(copy.tensor), currentPos(copy.currentPos) {}
 
-    TensorIterator& operator=(const TensorIterator& other) {
-      tensor = other.tensor;
-      currentPos = other.currentPos;
-      return *this;
+    Iterator(const Iterator&& move)
+        : tensor(move.tensor), currentPos(move.currentPos) {}
+
+    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
+
+    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
+
+    auto& operator[](const difference_type& n) {
+      return ITType::getElementRef(tensor, n);
     }
 
-    reference operator*() { return tensor[currentPos]; }
-
-    pointer operator->() { return &tensor[currentPos]; }
-
-    reference operator[](const difference_type& n) {
-      return tensor[n];
-    }
-
-    reference operator[](DimensionsList& coords) {
-      return tensor[tensor.coordsToIndex(coords)];
+    auto& operator[](DimensionsList& coords) {
+      auto index = tensor.coordsToIndex(coords);
+      return ITType::getElementRef(tensor, index);
     }
 
 #pragma region Seek Operators
 
-    TensorIterator& operator++() {
+    Iterator& operator++() {
       currentPos++;
       return *this;
     }
-    TensorIterator& operator--() {
+    Iterator& operator--() {
       currentPos--;
       return *this;
     }
 
-    TensorIterator operator++(int) {
-      TensorIterator result(*this);
+    Iterator operator++(int) {
+      Iterator result(*this);
       operator++();
       return result;
     }
-    TensorIterator operator--(int) {
-      TensorIterator result(*this);
+    Iterator operator--(int) {
+      Iterator result(*this);
       operator--();
       return result;
     }
 
-    TensorIterator operator+(const difference_type& n) const {
-      return TensorIterator(tensor, currentPos + n);
+    Iterator operator+(const difference_type& n) const {
+      return Iterator(tensor, currentPos + n);
     }
 
-    TensorIterator& operator+=(const difference_type& n) {
+    Iterator& operator+=(const difference_type& n) {
       currentPos += n;
       return *this;
     }
 
-    TensorIterator operator-(const difference_type& n) const {
-      return TensorIterator(tensor, currentPos + n);
+    Iterator operator-(const difference_type& n) const {
+      return Iterator(tensor, currentPos + n);
     }
 
-    TensorIterator& operator-=(const difference_type& n) {
+    Iterator& operator-=(const difference_type& n) {
       currentPos -= n;
       return *this;
     }
@@ -168,35 +191,35 @@ class Tensor {
 
 #pragma region Comparison Operators
 
-    bool operator==(const TensorIterator& other) const {
+    bool operator==(const Iterator& other) const {
       return currentPos == other.currentPos;
     }
 
-    bool operator!=(const TensorIterator& other) const {
+    bool operator!=(const Iterator& other) const {
       return currentPos != other.currentPos;
     }
 
-    bool operator<(const TensorIterator& other) const {
+    bool operator<(const Iterator& other) const {
       return currentPos < other.currentPos;
     }
 
-    bool operator>(const TensorIterator& other) const {
+    bool operator>(const Iterator& other) const {
       return currentPos > other.currentPos;
     }
 
-    bool operator<=(const TensorIterator& other) const {
+    bool operator<=(const Iterator& other) const {
       return currentPos <= other.currentPos;
     }
 
-    bool operator>=(const TensorIterator& other) const {
+    bool operator>=(const Iterator& other) const {
       return currentPos >= other.currentPos;
     }
 
-    difference_type operator+(const TensorIterator& other) const {
+    difference_type operator+(const Iterator& other) const {
       return currentPos + other.currentPos;
     }
 
-    difference_type operator-(const TensorIterator& other) const {
+    difference_type operator-(const Iterator& other) const {
       return currentPos - other.currentPos;
     }
 #pragma endregion
@@ -221,6 +244,9 @@ class Tensor {
     return index;
   }
 
+  using standard_iterator = Iterator<IteratorTypeStandard<ValueType>>;
+  using const_iterator = Iterator<IteratorTypeConst<ValueType>>;
+
  public:
   Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {
     this->sizes = sizes;
@@ -241,17 +267,31 @@ class Tensor {
   size_t totalItems() const { return _totalItems; }
   size_t itemsAt(size_t dimension) const { return sizes.at(dimension); }
 
-  TensorIterator begin() { return TensorIterator(*this); }
-  TensorIterator end() { return TensorIterator(*this, _totalItems); }
+  standard_iterator begin() { return standard_iterator(*this); }
+  standard_iterator end() { return standard_iterator(*this, _totalItems); }
+  const_iterator cbegin() { return const_iterator(*this); }
+  const_iterator cend() { return const_iterator(*this, _totalItems); }
 
-  ValueType& operator[](const size_t linearCoord) {
+  ValueType& operator[](const size_t linearCoord) { return at(linearCoord); }
+  ValueType& operator[](DimensionsList& coords) { return at(coords); }
+
+  ValueType& at(const size_t linearCoord) { return data.at(linearCoord); }
+
+  ValueType& at(DimensionsList& coords) {
+    auto index = coordsToIndex(coords);
+    return data.at(index);
+  }
+
+  const ValueType& c_at(const size_t linearCoord) const {
     return data.at(linearCoord);
   }
 
-  ValueType& operator[](DimensionsList& coords) {
+  const ValueType& c_at(DimensionsList& coords) const {
     auto index = coordsToIndex(coords);
     return data.at(index);
   }
 };
+
+};  // namespace TensorLib
 
 #endif

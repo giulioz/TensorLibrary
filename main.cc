@@ -2,9 +2,11 @@
 
 #include "Tensor.hpp"
 
+using namespace TensorLib;
+
 template <class TensorType>
 void printTensor(TensorType& t) {
-  for (auto iterator = t.begin(); iterator < t.end(); iterator++) {
+  for (auto iterator = t.cbegin(); iterator < t.cend(); iterator++) {
     std::cout << *iterator << ", ";
   }
 
