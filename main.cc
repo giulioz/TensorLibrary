@@ -13,6 +13,16 @@ void printTensor(TensorType& t) {
   std::cout << std::endl;
 }
 
+template <class TensorType>
+void printTensor(TensorType& t, FixedDimensionsList& indexList) {
+  for (auto iterator = t.constrained_begin(indexList);
+       iterator < t.constrained_end(indexList); iterator++) {
+    std::cout << *iterator << ", ";
+  }
+
+  std::cout << std::endl;
+}
+
 int main() {
   Tensor<int> tensor({2, 4, 2});
 
@@ -59,7 +69,7 @@ int main() {
 
   std::cout << "Write test: ";
   tensor[0] = 42;
-  tensor[{1,0,0}] = 43;
+  tensor[{1, 0, 0}] = 43;
   tensor.begin()[2] = 44;
   printTensor(tensor);
   std::cout << std::endl;
@@ -74,7 +84,6 @@ int main() {
   std::cout << "Tensor2: ";
   printTensor(tensor2);
 
-  tensor.constrained_begin();
-
+  printTensor(tensor, {1, 0, 0});
   return 0;
 }

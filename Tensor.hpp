@@ -33,8 +33,8 @@ static inline std::vector<size_t> calcStrides(DimensionsList dimensions) {
   return strides;
 }
 
-static inline size_t findFixedStride(const std::vector<size_t> strides,
-                                     FixedDimensionsList indexList) {
+static inline size_t findFixedStride(std::vector<size_t>& strides,
+                                     FixedDimensionsList& indexList) {
   size_t fixedStride = 0;
   size_t index = 0;
   for (auto&& fixedValue : indexList) {
@@ -49,21 +49,9 @@ static inline size_t findFixedStride(const std::vector<size_t> strides,
   return fixedStride;
 }
 
-static inline size_t findFixedIndex(FixedDimensionsList indexList) {
-  size_t index = 0;
-  for (auto&& fixedValue : indexList) {
-    if (fixedValue == VARIABLE_INDEX) {
-      return index;
-    }
-    index++;
-  }
-
-  return index;
-}
-
-static inline size_t findInitialPosition(const std::vector<size_t> strides,
-                                         FixedDimensionsList indexList,
-                                         const size_t width = 0) {
+static inline size_t findInitialPosition(std::vector<size_t>& strides,
+                                         FixedDimensionsList& indexList,
+                                         const size_t& width = 0) {
   size_t index = 0;
   size_t position = 0;
   for (auto&& fixedValue : indexList) {
@@ -76,6 +64,18 @@ static inline size_t findInitialPosition(const std::vector<size_t> strides,
   }
 
   return position;
+}
+
+static inline size_t findFixedIndex(FixedDimensionsList& indexList) {
+  size_t index = 0;
+  for (auto&& fixedValue : indexList) {
+    if (fixedValue == VARIABLE_INDEX) {
+      return index;
+    }
+    index++;
+  }
+
+  return index;
 }
 
 template <typename T>
@@ -105,6 +105,7 @@ struct is_callable {
 template <typename ValueType>
 class Tensor;
 
+// Standard iterator types
 template <typename ITValueType>
 struct IteratorTypeStandard {
   using ValueType = ITValueType;
@@ -116,6 +117,7 @@ struct IteratorTypeStandard {
   }
 };
 
+// Constant iterator types
 template <typename ITValueType>
 struct IteratorTypeConst {
   using ValueType = ITValueType;
@@ -127,24 +129,70 @@ struct IteratorTypeConst {
   }
 };
 
+// Fixed Index position
 template <typename stride_type = std::vector<size_t>,
           typename size_type = std::vector<size_t>>
 class IteratorIndexerConstrained {
-  stride_type& strides;
-  size_type& sizes;
+  // stride_type& strides;
+  // size_type& sizes;
+  size_t fixedStride;
   size_t pos;
 
  public:
-  IteratorIndexerConstrained(stride_type& strides, stride_type& sizes,
-                             size_t pos = 0)
-      : strides(strides), sizes(sizes), pos(pos) {}
+  IteratorIndexerConstrained(size_t fixedStride, size_t startPos)
+      : fixedStride(fixedStride), pos(startPos) {}
+
+  IteratorIndexerConstrained(IteratorIndexerConstrained& copy)
+      : fixedStride(copy.fixedStride), pos(copy.pos) {}
+
+  IteratorIndexerConstrained(IteratorIndexerConstrained&& move)
+      : fixedStride(move.fixedStride), pos(move.pos) {}
 
   size_t operator()() { return pos; }
+
+  IteratorIndexerConstrained& operator++() {
+    pos++;
+    return this;
+  }
+  IteratorIndexerConstrained& operator--() {
+    pos--;
+    return this;
+  }
+
+  IteratorIndexerConstrained operator++(int) {
+    IteratorIndexerConstrained result(this);
+    operator++();
+    return result;
+  }
+  IteratorIndexerConstrained operator--(int) {
+    IteratorIndexerConstrained result(this);
+    operator--();
+    return result;
+  }
+
+  IteratorIndexerConstrained operator+(const size_t& n) const {
+    return IteratorIndexerConstrained(fixedStride, pos + (n * fixedStride));
+  }
+
+  IteratorIndexerConstrained& operator+=(const size_t& n) {
+    pos += (n * fixedStride);
+    return this;
+  }
+
+  IteratorIndexerConstrained operator-(const size_t& n) const {
+    return IteratorIndexerConstrained(fixedStride, pos - (n * fixedStride));
+  }
+
+  IteratorIndexerConstrained& operator-=(const IteratorIndexerConstrained& n) {
+    pos -= (n * fixedStride);
+    return this;
+  }
 };
 
 template <typename ValueType>
 class Tensor {
  public:
+  // Iterator
   template <typename ITType = IteratorTypeStandard<ValueType>,
             typename ITIndexer = IteratorIndexerConstrained<>>
   class Iterator : public std::iterator<std::random_access_iterator_tag,
@@ -203,7 +251,6 @@ class Tensor {
     }
 
 #pragma region Seek Operators
-
     Iterator& operator++() {
       currentPos++;
       return *this;
@@ -280,6 +327,7 @@ class Tensor {
   };
 
  private:
+  // Tensor
   using ArrayType = typename std::vector<ValueType>;
 
   ArrayType data;
@@ -287,7 +335,7 @@ class Tensor {
   std::vector<size_t> sizes;
   size_t _totalItems;
 
-  size_t coordsToIndex(DimensionsList coords) {
+  size_t coordsToIndex(DimensionsList& coords) {
     size_t index = 0;
     size_t strideIndex = 0;
     for (auto&& coord : coords) {
@@ -316,10 +364,6 @@ class Tensor {
         sizes(other.sizes),
         _totalItems(other._totalItems) {}
 
-  // Tensor& operator=(const Tensor& other) {
-  //   return *this;
-  // }
-
   size_t totalItems() const { return _totalItems; }
   size_t itemsAt(size_t dimension) const { return sizes.at(dimension); }
 
@@ -328,13 +372,18 @@ class Tensor {
   const_iterator cbegin() { return const_iterator(*this); }
   const_iterator cend() { return const_iterator(*this, _totalItems); }
 
-  constrained_iterator constrained_begin() {
-    return constrained_iterator(*this,
-                                IteratorIndexerConstrained(strides, sizes));
-  }
-  constrained_iterator constrained_end() {
+  constrained_iterator constrained_begin(FixedDimensionsList& indexList) {
     return constrained_iterator(
-        *this, IteratorIndexerConstrained(strides, sizes, _totalItems));
+        *this,
+        IteratorIndexerConstrained(findFixedStride(strides, indexList),
+                                   findInitialPosition(strides, indexList)));
+  }
+  constrained_iterator constrained_end(FixedDimensionsList& indexList) {
+    return constrained_iterator(
+        *this, IteratorIndexerConstrained(
+                   findFixedStride(strides, indexList),
+                   findInitialPosition(strides, indexList,
+                                       sizes[findFixedIndex(indexList)])));
   }
 
   ValueType& operator[](const size_t linearCoord) { return at(linearCoord); }
