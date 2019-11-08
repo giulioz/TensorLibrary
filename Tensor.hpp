@@ -79,7 +79,7 @@ static inline size_t findFixedIndex(FixedDimensionsList& indexList) {
 }
 
 template <typename T>
-struct is_callable {
+struct is_callable_impl {
  private:
   typedef char (&yes)[1];
   typedef char (&no)[2];
@@ -101,6 +101,11 @@ struct is_callable {
  public:
   static const bool value = sizeof(test<Derived>(0)) == sizeof(yes);
 };
+
+template <typename T>
+struct is_callable
+    : std::conditional<std::is_class<T>::value, is_callable_impl<T>,
+                       std::false_type>::type {};
 
 template <typename ValueType>
 class Tensor;
@@ -223,30 +228,36 @@ class Tensor {
     Iterator(const Iterator&& move)
         : tensor(move.tensor), currentPos(move.currentPos) {}
 
-    template <typename Func = ITIndexer>
-    typename std::enable_if<std::is_function<Func()>::value,
-                            typename ITType::ReturnType>::type
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<is_callable<ITIndexer>::value, R>::type&
     operator*() {
       return ITType::getElementRef(tensor, currentPos());
     }
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<!is_callable<ITIndexer>::value, R>::type&
+    operator*() {
+      return ITType::getElementRef(tensor, currentPos);
+    }
 
-    template <typename Func = ITIndexer>
-    typename std::enable_if<std::is_function<Func()>::value,
-                            typename ITType::ReturnType>::type
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<is_callable<ITIndexer>::value, R>::type*
     operator->() {
       return &ITType::getElementRef(tensor, currentPos());
     }
-
-    template <typename Func = ITIndexer>
-    typename std::enable_if<std::is_function<Func()>::value,
-                            typename ITType::ReturnType>::type
-    operator[](const difference_type& n) {
-      return ITType::getElementRef(tensor, n());
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<!is_callable<ITIndexer>::value, R>::type*
+    operator->() {
+      return &ITType::getElementRef(tensor, currentPos);
     }
 
-    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
-    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
-    auto& operator[](const difference_type& n) {
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<is_callable<ITIndexer>::value, R>::type& operator[](
+        const difference_type& n) {
+      return ITType::getElementRef(tensor, n());
+    }
+    template <typename R = typename ITType::ReturnType>
+    typename std::enable_if<!is_callable<ITIndexer>::value, R>::type&
+    operator[](const difference_type& n) {
       return ITType::getElementRef(tensor, n);
     }
 
