@@ -78,12 +78,37 @@ static inline size_t findInitialPosition(const std::vector<size_t> strides,
   return position;
 }
 
+template <typename T>
+struct is_callable {
+ private:
+  typedef char (&yes)[1];
+  typedef char (&no)[2];
+
+  struct Fallback {
+    void operator()();
+  };
+  struct Derived : T, Fallback {};
+
+  template <typename U, U>
+  struct Check;
+
+  template <typename>
+  static yes test(...);
+
+  template <typename C>
+  static no test(Check<void (Fallback::*)(), &C::operator()>*);
+
+ public:
+  static const bool value = sizeof(test<Derived>(0)) == sizeof(yes);
+};
+
 template <typename ValueType>
 class Tensor;
 
 template <typename ITValueType>
 struct IteratorTypeStandard {
   using ValueType = ITValueType;
+  using ReturnType = ITValueType;
   using InternalTensorRef = Tensor<ValueType>&;
 
   static ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
@@ -94,6 +119,7 @@ struct IteratorTypeStandard {
 template <typename ITValueType>
 struct IteratorTypeConst {
   using ValueType = ITValueType;
+  using ReturnType = const ITValueType;
   using InternalTensorRef = const Tensor<ValueType>&;
 
   static const ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
@@ -101,41 +127,42 @@ struct IteratorTypeConst {
   }
 };
 
-struct IteratorIndexerLinear {
-  using IndexType = size_t;
+template <typename InternalTensorRef>
+class IteratorIndexerConstrained {
+  InternalTensorRef* tensor;
+  size_t pos;
 
-  static size_t getLinearIndex(IndexType pos) { return pos; }
+ public:
+  IteratorIndexerConstrained(InternalTensorRef& tensor) : tensor(tensor) {}
+
+  size_t operator()() { return tensor->c_at(pos); }
 };
 
 template <typename ValueType>
 class Tensor {
  public:
   template <typename ITType = IteratorTypeStandard<ValueType>,
-            typename ITIndexer = IteratorIndexerLinear>
+            typename ITIndexer =
+                IteratorIndexerConstrained<typename ITType::InternalTensorRef>>
   class Iterator : public std::iterator<std::random_access_iterator_tag,
-                                        typename ITType::ValueType> {
+                                        typename ITType::ValueType, ITIndexer> {
     friend class Tensor;
 
-   public:
-    using pointer =
+    using iterator_type =
         typename std::iterator<std::random_access_iterator_tag,
-                               typename ITType::ValueType,
-                               typename ITIndexer::IndexType>::pointer;
-    using reference =
-        typename std::iterator<std::random_access_iterator_tag,
-                               typename ITType::ValueType>::reference;
-    using difference_type =
-        typename std::iterator<std::random_access_iterator_tag,
-                               typename ITType::ValueType>::difference_type;
+                               typename ITType::ValueType, ITIndexer>;
 
+   public:
+    using pointer = typename iterator_type::pointer;
+    using reference = typename iterator_type::reference;
+    using difference_type = typename iterator_type::difference_type;
     using iterator_category = typename std::random_access_iterator_tag;
 
    private:
     typename ITType::InternalTensorRef tensor;
-    typename ITIndexer::IndexType currentPos;
+    ITIndexer currentPos;
 
-    Iterator(typename ITType::InternalTensorRef tensor,
-             typename ITIndexer::IndexType startPos = 0)
+    Iterator(typename ITType::InternalTensorRef tensor, ITIndexer startPos = 0)
         : tensor(tensor), currentPos(startPos) {}
 
    public:
@@ -145,18 +172,30 @@ class Tensor {
     Iterator(const Iterator&& move)
         : tensor(move.tensor), currentPos(move.currentPos) {}
 
-    auto& operator*() {
-      return ITType::getElementRef(tensor,
-                                   ITIndexer::getLinearIndex(currentPos));
+    template <typename Func, typename... Args>
+    typename std::enable_if<std::is_function<Func(Args...)>::value,
+                            typename ITType::ReturnType>::type
+    operator*() {
+      return ITType::getElementRef(tensor, currentPos());
     }
+    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
 
-    auto& operator-> () {
-      return &ITType::getElementRef(tensor,
-                                    ITIndexer::getLinearIndex(currentPos));
+    template <typename Func, typename... Args>
+    typename std::enable_if<std::is_function<Func(Args...)>::value,
+                            typename ITType::ReturnType>::type
+    operator->() {
+      return &ITType::getElementRef(tensor, currentPos());
     }
+    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
 
+    template <typename Func, typename... Args>
+    typename std::enable_if<std::is_function<Func(Args...)>::value,
+                            typename ITType::ReturnType>::type
+    operator[](const difference_type& n) {
+      return ITType::getElementRef(tensor, n());
+    }
     auto& operator[](const difference_type& n) {
-      return ITType::getElementRef(tensor, ITIndexer::getLinearIndex(n));
+      return ITType::getElementRef(tensor, n);
     }
 
 #pragma region Seek Operators
@@ -255,8 +294,9 @@ class Tensor {
     return index;
   }
 
-  using standard_iterator = Iterator<IteratorTypeStandard<ValueType>>;
-  using const_iterator = Iterator<IteratorTypeConst<ValueType>>;
+  using standard_iterator = Iterator<IteratorTypeStandard<ValueType>, size_t>;
+  using const_iterator = Iterator<IteratorTypeConst<ValueType>, size_t>;
+  // using constrained_iterator = Iterator<IteratorTypeStandard<ValueType>>;
 
  public:
   Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {
