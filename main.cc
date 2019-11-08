@@ -74,5 +74,7 @@ int main() {
   std::cout << "Tensor2: ";
   printTensor(tensor2);
 
+  tensor.constrained_begin();
+
   return 0;
 }

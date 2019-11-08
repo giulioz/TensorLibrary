@@ -127,23 +127,26 @@ struct IteratorTypeConst {
   }
 };
 
-template <typename InternalTensorRef>
+template <typename stride_type = std::vector<size_t>,
+          typename size_type = std::vector<size_t>>
 class IteratorIndexerConstrained {
-  InternalTensorRef* tensor;
+  stride_type& strides;
+  size_type& sizes;
   size_t pos;
 
  public:
-  IteratorIndexerConstrained(InternalTensorRef& tensor) : tensor(tensor) {}
+  IteratorIndexerConstrained(stride_type& strides, stride_type& sizes,
+                             size_t pos = 0)
+      : strides(strides), sizes(sizes), pos(pos) {}
 
-  size_t operator()() { return tensor->c_at(pos); }
+  size_t operator()() { return pos; }
 };
 
 template <typename ValueType>
 class Tensor {
  public:
   template <typename ITType = IteratorTypeStandard<ValueType>,
-            typename ITIndexer =
-                IteratorIndexerConstrained<typename ITType::InternalTensorRef>>
+            typename ITIndexer = IteratorIndexerConstrained<>>
   class Iterator : public std::iterator<std::random_access_iterator_tag,
                                         typename ITType::ValueType, ITIndexer> {
     friend class Tensor;
@@ -172,28 +175,29 @@ class Tensor {
     Iterator(const Iterator&& move)
         : tensor(move.tensor), currentPos(move.currentPos) {}
 
-    template <typename Func, typename... Args>
-    typename std::enable_if<std::is_function<Func(Args...)>::value,
+    template <typename Func = ITIndexer>
+    typename std::enable_if<std::is_function<Func()>::value,
                             typename ITType::ReturnType>::type
     operator*() {
       return ITType::getElementRef(tensor, currentPos());
     }
-    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
 
-    template <typename Func, typename... Args>
-    typename std::enable_if<std::is_function<Func(Args...)>::value,
+    template <typename Func = ITIndexer>
+    typename std::enable_if<std::is_function<Func()>::value,
                             typename ITType::ReturnType>::type
     operator->() {
       return &ITType::getElementRef(tensor, currentPos());
     }
-    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
 
-    template <typename Func, typename... Args>
-    typename std::enable_if<std::is_function<Func(Args...)>::value,
+    template <typename Func = ITIndexer>
+    typename std::enable_if<std::is_function<Func()>::value,
                             typename ITType::ReturnType>::type
     operator[](const difference_type& n) {
       return ITType::getElementRef(tensor, n());
     }
+
+    auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
+    auto& operator-> () { return &ITType::getElementRef(tensor, currentPos); }
     auto& operator[](const difference_type& n) {
       return ITType::getElementRef(tensor, n);
     }
@@ -296,7 +300,8 @@ class Tensor {
 
   using standard_iterator = Iterator<IteratorTypeStandard<ValueType>, size_t>;
   using const_iterator = Iterator<IteratorTypeConst<ValueType>, size_t>;
-  // using constrained_iterator = Iterator<IteratorTypeStandard<ValueType>>;
+  using constrained_iterator =
+      Iterator<IteratorTypeStandard<ValueType>, IteratorIndexerConstrained<>>;
 
  public:
   Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {
@@ -322,6 +327,15 @@ class Tensor {
   standard_iterator end() { return standard_iterator(*this, _totalItems); }
   const_iterator cbegin() { return const_iterator(*this); }
   const_iterator cend() { return const_iterator(*this, _totalItems); }
+
+  constrained_iterator constrained_begin() {
+    return constrained_iterator(*this,
+                                IteratorIndexerConstrained(strides, sizes));
+  }
+  constrained_iterator constrained_end() {
+    return constrained_iterator(
+        *this, IteratorIndexerConstrained(strides, sizes, _totalItems));
+  }
 
   ValueType& operator[](const size_t linearCoord) { return at(linearCoord); }
   ValueType& operator[](DimensionsList& coords) { return at(coords); }
