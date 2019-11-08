@@ -135,11 +135,7 @@ struct IteratorTypeConst {
 };
 
 // Fixed Index position
-template <typename stride_type = std::vector<size_t>,
-          typename size_type = std::vector<size_t>>
 class IteratorIndexerConstrained {
-  // stride_type& strides;
-  // size_type& sizes;
   size_t fixedStride;
   size_t pos;
 
@@ -147,7 +143,7 @@ class IteratorIndexerConstrained {
   IteratorIndexerConstrained(size_t fixedStride, size_t startPos)
       : fixedStride(fixedStride), pos(startPos) {}
 
-  IteratorIndexerConstrained(IteratorIndexerConstrained& copy)
+  IteratorIndexerConstrained(const IteratorIndexerConstrained& copy)
       : fixedStride(copy.fixedStride), pos(copy.pos) {}
 
   IteratorIndexerConstrained(IteratorIndexerConstrained&& move)
@@ -157,20 +153,20 @@ class IteratorIndexerConstrained {
 
   IteratorIndexerConstrained& operator++() {
     pos++;
-    return this;
+    return *this;
   }
   IteratorIndexerConstrained& operator--() {
     pos--;
-    return this;
+    return *this;
   }
 
   IteratorIndexerConstrained operator++(int) {
-    IteratorIndexerConstrained result(this);
+    IteratorIndexerConstrained result(*this);
     operator++();
     return result;
   }
   IteratorIndexerConstrained operator--(int) {
-    IteratorIndexerConstrained result(this);
+    IteratorIndexerConstrained result(*this);
     operator--();
     return result;
   }
@@ -181,16 +177,40 @@ class IteratorIndexerConstrained {
 
   IteratorIndexerConstrained& operator+=(const size_t& n) {
     pos += (n * fixedStride);
-    return this;
+    return *this;
   }
 
   IteratorIndexerConstrained operator-(const size_t& n) const {
     return IteratorIndexerConstrained(fixedStride, pos - (n * fixedStride));
   }
 
-  IteratorIndexerConstrained& operator-=(const IteratorIndexerConstrained& n) {
+  IteratorIndexerConstrained& operator-=(const size_t& n) {
     pos -= (n * fixedStride);
-    return this;
+    return *this;
+  }
+
+  bool operator==(const IteratorIndexerConstrained& other) const {
+    return pos == other.pos;
+  }
+
+  bool operator!=(const IteratorIndexerConstrained& other) const {
+    return pos != other.pos;
+  }
+
+  bool operator<(const IteratorIndexerConstrained& other) const {
+    return pos < other.pos;
+  }
+
+  bool operator>(const IteratorIndexerConstrained& other) const {
+    return pos > other.pos;
+  }
+
+  bool operator<=(const IteratorIndexerConstrained& other) const {
+    return pos <= other.pos;
+  }
+
+  bool operator>=(const IteratorIndexerConstrained& other) const {
+    return pos >= other.pos;
   }
 };
 
@@ -199,7 +219,7 @@ class Tensor {
  public:
   // Iterator
   template <typename ITType = IteratorTypeStandard<ValueType>,
-            typename ITIndexer = IteratorIndexerConstrained<>>
+            typename ITIndexer = size_t>
   class Iterator : public std::iterator<std::random_access_iterator_tag,
                                         typename ITType::ValueType, ITIndexer> {
     friend class Tensor;
@@ -360,7 +380,7 @@ class Tensor {
   using standard_iterator = Iterator<IteratorTypeStandard<ValueType>, size_t>;
   using const_iterator = Iterator<IteratorTypeConst<ValueType>, size_t>;
   using constrained_iterator =
-      Iterator<IteratorTypeStandard<ValueType>, IteratorIndexerConstrained<>>;
+      Iterator<IteratorTypeStandard<ValueType>, IteratorIndexerConstrained>;
 
  public:
   Tensor(DimensionsList sizes) : data(calcDataSize(sizes)) {

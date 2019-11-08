@@ -83,10 +83,19 @@ int main() {
   printTensor(tensor);
   std::cout << "Tensor2: ";
   printTensor(tensor2);
+  std::cout << std::endl;
 
-  auto it = tensor.constrained_begin({1, 0, 0});
-  std::cout << *it << std::endl;
-  // tensor.constrained_end({1, 0, 0})[1] = 1000;
-  printTensor(tensor);
+  std::cout << "Constrained Test: " << std::endl;
+  auto it = tensor2.constrained_begin({1, 0, 0});
+  auto end = tensor2.constrained_end({1, 0, 0});
+  while (it < end) {
+    std::cout << *it << std::endl;
+    it++;
+  }
+  std::cout << std::endl;
+
+  // tensor2.constrained_end({1, 0, 0})[1] = 1000;
+  // printTensor(tensor2);
+
   return 0;
 }
