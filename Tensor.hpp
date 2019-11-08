@@ -406,6 +406,6 @@ class Tensor {
   }
 };
 
-};  // namespace TensorLib
+}  // namespace TensorLib
 
 #endif

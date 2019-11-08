@@ -84,6 +84,9 @@ int main() {
   std::cout << "Tensor2: ";
   printTensor(tensor2);
 
-  printTensor(tensor, {1, 0, 0});
+  auto it = tensor.constrained_begin({1, 0, 0});
+  std::cout << *it << std::endl;
+  // tensor.constrained_end({1, 0, 0})[1] = 1000;
+  printTensor(tensor);
   return 0;
 }
