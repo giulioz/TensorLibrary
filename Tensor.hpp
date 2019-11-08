@@ -4,7 +4,6 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
-#include <iostream>
 #include <memory>
 #include <numeric>
 #include <tuple>
@@ -235,12 +234,6 @@ class Tensor {
     this->sizes = sizes;
     _totalItems = data.size();
     strides = calcStrides(sizes);
-
-    std::cout << "Strides ";
-    for (auto&& stride : strides) {
-      std::cout << stride << " ";
-    }
-    std::cout << std::endl;
   }
 
   Tensor(const Tensor& other)
@@ -258,15 +251,11 @@ class Tensor {
   const_iterator cend() { return const_iterator(*this, 1, _totalItems); }
 
   constrained_iterator constrained_begin(DimensionsList& indexList) {
-    std:: cout << "Fixed stride: " << strides[findFixedIndex(indexList)] << std::endl;
-    std:: cout << "Start index: " << calcFixedStartIndex(strides, indexList) << std::endl;
     return constrained_iterator(*this,
                                 strides[findFixedIndex(indexList)],
                                 calcFixedStartIndex(strides, indexList));
   }
   constrained_iterator constrained_end(DimensionsList& indexList) {
-    std:: cout << "Fixed stride: " << strides[findFixedIndex(indexList)] << std::endl;
-    std:: cout << "Start index: " << calcFixedStartIndex(strides, indexList,sizes[findFixedIndex(indexList)]) << std::endl;
     return constrained_iterator(
         *this, strides[findFixedIndex(indexList)],
         calcFixedStartIndex(strides, indexList,
