@@ -25,6 +25,7 @@ void printTensor(TensorType& t, DimensionsList& indexList) {
 
 int main() {
   Tensor<int> tensor({2, 4, 2});
+  // Tensor<int> tensor({8, 2});
 
   tensor[{0, 0, 0}] = 111;
   tensor[{1, 0, 0}] = 211;
