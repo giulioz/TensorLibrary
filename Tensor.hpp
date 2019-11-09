@@ -277,7 +277,7 @@ class Tensor {
   using DimsInitType = typename TensorType::InitializerDimensionsType;
 
   // Internal Data
-  std::vector<ValueType> data;
+  std::shared_ptr<std::vector<ValueType>> data;
   typename TensorType::StridesType strides;
   typename TensorType::SizesType sizes;
   size_t _totalItems;
@@ -285,18 +285,19 @@ class Tensor {
  public:
   // Public Constructors
 
-  Tensor(typename TensorType::InitializerDimensionsType sizes)
-      : data(InternalUtils::calcDataSize(sizes)), sizes(sizes) {
+  Tensor(typename TensorType::InitializerDimensionsType sizes) : sizes(sizes) {
+    data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = data.size();
+    _totalItems = (*data).size();
   }
 
   template <typename... Sizes>
-  Tensor(Sizes... sizes)
-      : data(InternalUtils::calcDataSize(sizes...)),
-        sizes(DimsInitType{static_cast<size_t>(sizes)...}) {
+  Tensor(Sizes... sizes) : sizes(DimsInitType{static_cast<size_t>(sizes)...}) {
+    data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
     InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = data.size();
+    _totalItems = (*data).size();
   }
 
   // Copy Constructor
@@ -400,27 +401,29 @@ class Tensor {
   // Access Operators, both linear and with coordinates
   //
 
-  ValueType& operator[](const size_t linearCoord) { return data[linearCoord]; }
+  ValueType& operator[](const size_t linearCoord) {
+    return (*data)[linearCoord];
+  }
   ValueType& operator[](typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
     auto index = InternalUtils::coordsToIndex(coords, strides);
-    return data[index];
+    return (*data)[index];
   }
 
-  ValueType& at(const size_t linearCoord) { return data.at(linearCoord); }
+  ValueType& at(const size_t linearCoord) { return (*data).at(linearCoord); }
   ValueType& at(typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
     auto index = InternalUtils::coordsToIndex(coords, strides);
-    return data.at(index);
+    return (*data).at(index);
   }
 
   const ValueType& c_at(const size_t linearCoord) const {
-    return data.at(linearCoord);
+    return (*data).at(linearCoord);
   }
   const ValueType& c_at(typename TensorType::DimensionsType& coords) const {
     assert(coords.size() == rank());
     auto index = InternalUtils::coordsToIndex(coords, strides);
-    return data.at(index);
+    return (*data).at(index);
   }
 };
 

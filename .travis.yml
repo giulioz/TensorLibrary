@@ -8,6 +8,7 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
       - g++-9
+      - valgrind
 
 script:
   - export CC=gcc-9
@@ -16,3 +17,4 @@ script:
   - cmake CMakeLists.txt
   - cmake  --build . --target tensor-library
   - ./tensor-library
+  - valgrind --leak-check=full ./tensor-library
