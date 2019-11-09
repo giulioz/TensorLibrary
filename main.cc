@@ -98,7 +98,7 @@ int main() {
   }
   std::cout << std::endl;
 
-  tensorCopy.constrained_begin({1, 0, 0})[1] = 1000;
+  tensorCopy.constrained_begin({VARIABLE_INDEX, 0, 0})[1] = 1000;
   printTensor(tensorCopy);
   std::cout << std::endl;
 
