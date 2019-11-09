@@ -17,4 +17,4 @@ script:
   - cmake CMakeLists.txt
   - cmake  --build . --target tensor-library
   - ./tensor-library
-  - valgrind --leak-check=full --error-exitcode=1 ./tensor-library
+  - valgrind --leak-check=full --error-exitcode=123 ./tensor-library
