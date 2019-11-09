@@ -156,12 +156,13 @@ class Iterator {
   using iterator_category = std::random_access_iterator_tag;
 
  private:
+  // Instance Fields
   typename ITType::InternalTensorRef tensor;
-  size_t currentPos;
-  size_t fixedStride;
+  difference_type currentPos;
+  difference_type fixedStride;
 
-  Iterator(typename ITType::InternalTensorRef tensor, size_t startPos = 0,
-           size_t fixedStride = 1)
+  Iterator(typename ITType::InternalTensorRef tensor,
+           difference_type startPos = 0, difference_type fixedStride = 1)
       : tensor(tensor), currentPos(startPos), fixedStride(fixedStride) {}
 
  public:
