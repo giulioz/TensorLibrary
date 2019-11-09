@@ -13,14 +13,24 @@ void printTensor(TensorType& t) {
   std::cout << std::endl;
 }
 
-template <class TensorType>
-void printTensor(TensorType& t, DimensionsList& indexList) {
+template <class TensorType, class DimensionsType>
+void printTensor(TensorType& t, DimensionsType& indexList) {
   for (auto iterator = t.constrained_begin(indexList);
        iterator < t.constrained_end(indexList); iterator++) {
     std::cout << *iterator << ", ";
   }
 
   std::cout << std::endl;
+}
+
+void fixedRankTest() {
+  std::cout << "Fixed Rank Test: " << std::endl;
+  Tensor<int, TensorTypeFixedRank<2>> tensor(2, 2);
+  tensor[{0, 0}] = 11;
+  tensor[{1, 0}] = 21;
+  tensor[{0, 1}] = 12;
+  tensor[{1, 1}] = 22;
+  printTensor(tensor);
 }
 
 int main() {
@@ -82,6 +92,9 @@ int main() {
 
   tensorCopy.constrained_end({1, 0, 0})[1] = 1000;
   printTensor(tensorCopy);
+  std::cout << std::endl;
+
+  fixedRankTest();
 
   return 0;
 }
