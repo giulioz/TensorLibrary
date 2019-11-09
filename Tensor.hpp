@@ -1,6 +1,7 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
+#include <assert.h>
 #include <array>
 #include <functional>
 #include <initializer_list>
@@ -9,7 +10,6 @@
 #include <numeric>
 #include <tuple>
 #include <vector>
-#include <assert.h>
 
 namespace TensorLib {
 
@@ -143,20 +143,17 @@ struct IteratorTypeConst {
 // Custom Iterator for Tensor
 //
 template <typename ITType>
-class Iterator : public std::iterator<std::random_access_iterator_tag,
-                                      typename ITType::ValueType, size_t> {
+class Iterator {
   template <typename, typename>
   friend class Tensor;
 
-  using iterator_type =
-      typename std::iterator<std::random_access_iterator_tag,
-                             typename ITType::ValueType, size_t>;
-
  public:
-  using pointer = typename iterator_type::pointer;
-  using reference = typename iterator_type::reference;
-  using difference_type = typename iterator_type::difference_type;
-  using iterator_category = typename std::random_access_iterator_tag;
+  // Iterator Traits
+  using difference_type = size_t;
+  using value_type = typename ITType::ValueType;
+  using pointer = typename ITType::ValueType*;
+  using reference = typename ITType::ValueType&;
+  using iterator_category = std::random_access_iterator_tag;
 
  private:
   typename ITType::InternalTensorRef tensor;
@@ -326,53 +323,60 @@ class Tensor {
   ConstIterator cend() { return ConstIterator(*this, _totalItems); }
 
   ConstrainedIterator constrained_begin(
-      typename TensorType::DimensionsType& indexList) {
-    return ConstrainedIterator(*this, calcFixedStartIndex(strides, indexList),
-                               strides[findFixedIndex(indexList)]);
+      typename TensorType::DimensionsType& coords) {
+    assert(coords.size() == rank());
+    return ConstrainedIterator(*this, calcFixedStartIndex(strides, coords),
+                               strides[findFixedIndex(coords)]);
   }
   ConstrainedIterator constrained_end(
-      typename TensorType::DimensionsType& indexList) {
-    const auto variableIndex = findFixedIndex(indexList);
+      typename TensorType::DimensionsType& coords) {
+    assert(coords.size() == rank());
+    const auto variableIndex = findFixedIndex(coords);
     return ConstrainedIterator(
-        *this, calcFixedStartIndex(strides, indexList, sizes[variableIndex]),
+        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
         strides[variableIndex]);
   }
 
   ConstrainedIterator constrained_begin(
-      typename TensorType::DimensionsType& indexList, size_t variableIndex) {
-    return ConstrainedIterator(*this, calcFixedStartIndex(strides, indexList),
+      typename TensorType::DimensionsType& coords, size_t variableIndex) {
+    assert(coords.size() == rank());
+    return ConstrainedIterator(*this, calcFixedStartIndex(strides, coords),
                                strides[variableIndex]);
   }
   ConstrainedIterator constrained_end(
-      typename TensorType::DimensionsType& indexList, size_t variableIndex) {
+      typename TensorType::DimensionsType& coords, size_t variableIndex) {
+    assert(coords.size() == rank());
     return ConstrainedIterator(
-        *this, calcFixedStartIndex(strides, indexList, sizes[variableIndex]),
+        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
         strides[variableIndex]);
   }
 
   ConstrainedConstIterator constrained_cbegin(
-      typename TensorType::DimensionsType& indexList) {
-    return ConstrainedConstIterator(*this,
-                                    calcFixedStartIndex(strides, indexList),
-                                    strides[findFixedIndex(indexList)]);
+      typename TensorType::DimensionsType& coords) {
+    assert(coords.size() == rank());
+    return ConstrainedConstIterator(*this, calcFixedStartIndex(strides, coords),
+                                    strides[findFixedIndex(coords)]);
   }
   ConstrainedConstIterator constrained_cend(
-      typename TensorType::DimensionsType& indexList) {
-    const auto variableIndex = findFixedIndex(indexList);
+      typename TensorType::DimensionsType& coords) {
+    assert(coords.size() == rank());
+    const auto variableIndex = findFixedIndex(coords);
     return ConstrainedConstIterator(
-        *this, calcFixedStartIndex(strides, indexList, sizes[variableIndex]),
+        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
         strides[variableIndex]);
   }
 
   ConstrainedConstIterator constrained_cbegin(
-      typename TensorType::DimensionsType& indexList, size_t variableIndex) {
-    return ConstrainedConstIterator(
-        *this, calcFixedStartIndex(strides, indexList), strides[variableIndex]);
+      typename TensorType::DimensionsType& coords, size_t variableIndex) {
+    assert(coords.size() == rank());
+    return ConstrainedConstIterator(*this, calcFixedStartIndex(strides, coords),
+                                    strides[variableIndex]);
   }
   ConstrainedConstIterator constrained_cend(
-      typename TensorType::DimensionsType& indexList, size_t variableIndex) {
+      typename TensorType::DimensionsType& coords, size_t variableIndex) {
+    assert(coords.size() == rank());
     return ConstrainedConstIterator(
-        *this, calcFixedStartIndex(strides, indexList, sizes[variableIndex]),
+        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
         strides[variableIndex]);
   }
 

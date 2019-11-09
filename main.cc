@@ -31,6 +31,8 @@ void fixedRankTest() {
   tensor[{0, 1}] = 12;
   tensor[{1, 1}] = 22;
   printTensor(tensor);
+
+  auto it = tensor.constrained_begin({VARIABLE_INDEX, 1});
 }
 
 int main() {
