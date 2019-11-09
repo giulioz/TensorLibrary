@@ -16,6 +16,29 @@ namespace TensorLib {
 // Placeholder for Constrained Iterator
 extern const size_t VARIABLE_INDEX;
 
+// Types for Dynamic Rank Tensor
+struct TensorTypeDynamicRank {
+  using StridesType = std::vector<size_t>;
+  using SizesType = std::vector<size_t>;
+  using DimensionsType = const std::vector<size_t>&;
+  using InitializerDimensionsType = const std::initializer_list<size_t>&;
+};
+
+// Types for Fixes Rank Tensor
+template <size_t Rank>
+struct TensorTypeFixedRank {
+  using StridesType = std::array<size_t, Rank>;
+  using SizesType = std::array<size_t, Rank>;
+  using DimensionsType = const std::array<size_t, Rank>&;
+  using InitializerDimensionsType = const std::array<size_t, Rank>&;
+};
+
+// Forward Declarations
+template <typename ValueType, typename TensorType = TensorTypeDynamicRank>
+class Tensor;
+
+namespace InternalUtils {
+
 // Utility functions
 template <typename StridesType, typename CoordsType>
 size_t coordsToIndex(const CoordsType& coords, const StridesType& strides) {
@@ -96,25 +119,6 @@ size_t findFixedIndex(const CoordsType& indexList) {
   return index;
 }
 
-struct TensorTypeDynamicRank {
-  using StridesType = std::vector<size_t>;
-  using SizesType = std::vector<size_t>;
-  using DimensionsType = const std::vector<size_t>&;
-  using InitializerDimensionsType = const std::initializer_list<size_t>&;
-};
-
-template <size_t Rank>
-struct TensorTypeFixedRank {
-  using StridesType = std::array<size_t, Rank>;
-  using SizesType = std::array<size_t, Rank>;
-  using DimensionsType = const std::array<size_t, Rank>&;
-  using InitializerDimensionsType = const std::array<size_t, Rank>&;
-};
-
-// Forward Declarations
-template <typename ValueType, typename TensorType = TensorTypeDynamicRank>
-class Tensor;
-
 // Standard iterator types
 template <typename ITValueType, typename TensorType>
 struct IteratorTypeStandard {
@@ -138,6 +142,8 @@ struct IteratorTypeConst {
     return tensor.c_at(pos);
   }
 };
+
+}  // namespace InternalUtils
 
 //
 // Custom Iterator for Tensor
@@ -258,13 +264,14 @@ class Iterator {
 template <typename ValueType, typename TensorType>
 class Tensor {
  private:
-  using StandardIterator =
-      Iterator<IteratorTypeStandard<ValueType, TensorType>>;
-  using ConstIterator = Iterator<IteratorTypeConst<ValueType, TensorType>>;
-  using ConstrainedIterator =
-      Iterator<IteratorTypeStandard<ValueType, TensorType>>;
-  using ConstrainedConstIterator =
-      Iterator<IteratorTypeStandard<ValueType, TensorType>>;
+  using StandardIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
+  using ConstIterator = Iterator<
+      typename InternalUtils::IteratorTypeConst<ValueType, TensorType>>;
+  using ConstrainedIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
+  using ConstrainedConstIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
 
   using DimsType = typename TensorType::DimensionsType;
   using DimsInitType = typename TensorType::InitializerDimensionsType;
@@ -279,16 +286,16 @@ class Tensor {
   // Public Constructors
 
   Tensor(typename TensorType::InitializerDimensionsType sizes)
-      : data(calcDataSize(sizes)), sizes(sizes) {
-    calcStrides(this->sizes, strides);
+      : data(InternalUtils::calcDataSize(sizes)), sizes(sizes) {
+    InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = data.size();
   }
 
   template <typename... Sizes>
   Tensor(Sizes... sizes)
-      : data(calcDataSize(sizes...)),
+      : data(InternalUtils::calcDataSize(sizes...)),
         sizes(DimsInitType{static_cast<size_t>(sizes)...}) {
-    calcStrides(this->sizes, strides);
+    InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = data.size();
   }
 
@@ -326,76 +333,84 @@ class Tensor {
   ConstrainedIterator constrained_begin(
       typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    return ConstrainedIterator(*this, calcFixedStartIndex(strides, coords),
-                               strides[findFixedIndex(coords)]);
+    return ConstrainedIterator(
+        *this, InternalUtils::calcFixedStartIndex(strides, coords),
+        strides[InternalUtils::findFixedIndex(coords)]);
   }
   ConstrainedIterator constrained_end(
       typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    const auto variableIndex = findFixedIndex(coords);
-    return ConstrainedIterator(
-        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
-        strides[variableIndex]);
+    const auto variableIndex = InternalUtils::findFixedIndex(coords);
+    return ConstrainedIterator(*this,
+                               InternalUtils::calcFixedStartIndex(
+                                   strides, coords, sizes[variableIndex]),
+                               strides[variableIndex]);
   }
 
   ConstrainedIterator constrained_begin(
       typename TensorType::DimensionsType& coords, size_t variableIndex) {
     assert(coords.size() == rank());
-    return ConstrainedIterator(*this, calcFixedStartIndex(strides, coords),
-                               strides[variableIndex]);
+    return ConstrainedIterator(
+        *this, InternalUtils::calcFixedStartIndex(strides, coords),
+        strides[variableIndex]);
   }
   ConstrainedIterator constrained_end(
       typename TensorType::DimensionsType& coords, size_t variableIndex) {
     assert(coords.size() == rank());
-    return ConstrainedIterator(
-        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
-        strides[variableIndex]);
+    return ConstrainedIterator(*this,
+                               InternalUtils::calcFixedStartIndex(
+                                   strides, coords, sizes[variableIndex]),
+                               strides[variableIndex]);
   }
 
   ConstrainedConstIterator constrained_cbegin(
       typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    return ConstrainedConstIterator(*this, calcFixedStartIndex(strides, coords),
-                                    strides[findFixedIndex(coords)]);
+    return ConstrainedConstIterator(
+        *this, InternalUtils::calcFixedStartIndex(strides, coords),
+        strides[InternalUtils::findFixedIndex(coords)]);
   }
   ConstrainedConstIterator constrained_cend(
       typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    const auto variableIndex = findFixedIndex(coords);
-    return ConstrainedConstIterator(
-        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
-        strides[variableIndex]);
-  }
-
-  ConstrainedConstIterator constrained_cbegin(
-      typename TensorType::DimensionsType& coords, size_t variableIndex) {
-    assert(coords.size() == rank());
-    return ConstrainedConstIterator(*this, calcFixedStartIndex(strides, coords),
+    const auto variableIndex = InternalUtils::findFixedIndex(coords);
+    return ConstrainedConstIterator(*this,
+                                    InternalUtils::calcFixedStartIndex(
+                                        strides, coords, sizes[variableIndex]),
                                     strides[variableIndex]);
   }
-  ConstrainedConstIterator constrained_cend(
+
+  ConstrainedConstIterator constrained_cbegin(
       typename TensorType::DimensionsType& coords, size_t variableIndex) {
     assert(coords.size() == rank());
     return ConstrainedConstIterator(
-        *this, calcFixedStartIndex(strides, coords, sizes[variableIndex]),
+        *this, InternalUtils::calcFixedStartIndex(strides, coords),
         strides[variableIndex]);
+  }
+  ConstrainedConstIterator constrained_cend(
+      typename TensorType::DimensionsType& coords, size_t variableIndex) {
+    assert(coords.size() == rank());
+    return ConstrainedConstIterator(*this,
+                                    InternalUtils::calcFixedStartIndex(
+                                        strides, coords, sizes[variableIndex]),
+                                    strides[variableIndex]);
   }
 
   //
-  // Access Operators, both linear and coordinates
+  // Access Operators, both linear and with coordinates
   //
 
   ValueType& operator[](const size_t linearCoord) { return data[linearCoord]; }
   ValueType& operator[](typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    auto index = coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides);
     return data[index];
   }
 
   ValueType& at(const size_t linearCoord) { return data.at(linearCoord); }
   ValueType& at(typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    auto index = coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides);
     return data.at(index);
   }
 
@@ -404,7 +419,7 @@ class Tensor {
   }
   const ValueType& c_at(typename TensorType::DimensionsType& coords) const {
     assert(coords.size() == rank());
-    auto index = coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides);
     return data.at(index);
   }
 };
