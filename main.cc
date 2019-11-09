@@ -90,15 +90,15 @@ int main() {
   std::cout << std::endl;
 
   std::cout << "Constrained Test: " << std::endl;
-  auto it = tensorCopy.constrained_begin({VARIABLE_INDEX, 2, 0});
-  auto end = tensorCopy.constrained_end({VARIABLE_INDEX, 2, 0});
+  auto it = tensorCopy.constrained_cbegin({VARIABLE_INDEX, 2, 0});
+  auto end = tensorCopy.constrained_cend({VARIABLE_INDEX, 2, 0});
   while (it < end) {
     std::cout << *it << std::endl;
     it++;
   }
   std::cout << std::endl;
 
-  tensorCopy.constrained_end({1, 0, 0})[1] = 1000;
+  tensorCopy.constrained_begin({1, 0, 0})[1] = 1000;
   printTensor(tensorCopy);
   std::cout << std::endl;
 
