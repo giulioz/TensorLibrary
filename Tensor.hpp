@@ -9,6 +9,7 @@
 #include <numeric>
 #include <tuple>
 #include <vector>
+#include <assert.h>
 
 namespace TensorLib {
 
