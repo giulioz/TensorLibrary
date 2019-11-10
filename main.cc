@@ -71,12 +71,28 @@ void sharingTest() {
 
 void sliceTest() {
   std::cout << "Slicing Test: " << std::endl;
-  auto t1 = genTensor();
+  Tensor<int> t1(2, 2);
+  std::fill(t1.begin(), t1.end(), 0);
+  int k = 0;
+  for (auto& i : t1) {
+    i = k;
+    k++;
+  }
+  std::cout << "[0,0]: " << t1[{0, 0}] << std::endl;
+  std::cout << "[0,1]: " << t1[{0, 1}] << std::endl;
+  std::cout << "[1,0]: " << t1[{1, 0}] << std::endl;
+  std::cout << "[1,1]: " << t1[{1, 1}] << std::endl;
+  printTensor(t1);
+  assertTensorValues(t1, "0, 1, 2, 3, \n");
+
   Tensor<int> t2 = t1.slice(1, 1);
-  // printTensor(t1);
-  // assertTensorValues(t1, "9, 9, 9, 9, \n");
-  // printTensor(t2);
-  // assertTensorValues(t2, "9, 9 \n");
+  printTensor(t2);
+  // assertTensorValues(t2, "2, 3, \n");
+  Tensor<int> t3 = t1.slice(1, 0);
+  printTensor(t3);
+  // assertTensorValues(t3, "0, 1, \n");
+  Tensor<int> t4 = t1.slice(0, 0);
+  printTensor(t4);
 
   std::cout << std::endl;
 }

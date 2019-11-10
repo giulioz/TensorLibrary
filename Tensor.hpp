@@ -444,34 +444,37 @@ class Tensor {
   //
 
   ValueType& operator[](const size_t linearCoord) {
-    return (*data)[linearCoord];
+    return (*data)[linearCoord + offset];
   }
   ValueType& operator[](typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data)[index];
   }
 
-  ValueType& at(const size_t linearCoord) { return (*data).at(linearCoord); }
+  ValueType& at(const size_t linearCoord) {
+    return (*data).at(linearCoord + offset);
+  }
   ValueType& at(typename TensorType::DimensionsType& coords) {
     assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data).at(index);
   }
 
   const ValueType& c_at(const size_t linearCoord) const {
-    return (*data).at(linearCoord);
+    return (*data).at(linearCoord + offset);
   }
   const ValueType& c_at(typename TensorType::DimensionsType& coords) const {
     assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides);
+    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data).at(index);
   }
 
   //
-  // Slicing and copying
+  // Manipulation functions
   //
 
+  // Clones the tensor without sharing data
   Tensor<ValueType, TensorType> clone() const {
     Tensor<ValueType, TensorType> building;
     building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
@@ -483,21 +486,25 @@ class Tensor {
     return building;
   }
 
+  // Returns a slice of the tensor
   Tensor<ValueType, TensorType> slice(size_t dimensionIndex,
                                       size_t fixedDimensionValue) const {
-    assert(dimensionIndex <= rank() &&
+    assert(dimensionIndex < rank() &&
            fixedDimensionValue <= sizes[dimensionIndex]);
+
     Tensor<ValueType, TensorType> sliced;
-    sliced.sizes.insert(sizes.end(), sizes.begin(),
+    sliced.sizes.insert(sliced.sizes.end(), sizes.begin(),
                         sizes.begin() + dimensionIndex);
-    sliced.sizes.insert(sizes.end(), sizes.begin() + dimensionIndex + 1,
+    sliced.sizes.insert(sliced.sizes.end(), sizes.begin() + dimensionIndex + 1,
                         sizes.end());
-    sliced.strides.insert(sizes.end(), sizes.begin(),
-                          sizes.begin() + dimensionIndex);
-    sliced.strides.insert(sizes.end(), sizes.begin() + dimensionIndex + 1,
-                          sizes.end());
+    sliced.strides.insert(sliced.strides.end(), strides.begin(),
+                          strides.begin() + dimensionIndex);
+    sliced.strides.insert(sliced.strides.end(),
+                          strides.begin() + dimensionIndex + 1, strides.end());
     sliced.data = data;
     sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
+    sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
+
     return sliced;
   }
 
