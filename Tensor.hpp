@@ -293,7 +293,12 @@ class Tensor {
   size_t offset;
 
   // Empty Constructor
-  Tensor() {}
+  Tensor()
+      : data(std::make_shared<std::vector<ValueType>>(0)),
+        strides(0),
+        sizes(0),
+        _totalItems(0),
+        offset(0) {}
 
  public:
   // Public Constructors
@@ -365,8 +370,8 @@ class Tensor {
 
   StandardIterator begin() { return StandardIterator(*this); }
   StandardIterator end() { return StandardIterator(*this, _totalItems); }
-  ConstIterator cbegin() { return ConstIterator(*this); }
-  ConstIterator cend() { return ConstIterator(*this, _totalItems); }
+  ConstIterator cbegin() const { return ConstIterator(*this); }
+  ConstIterator cend() const { return ConstIterator(*this, _totalItems); }
 
   ConstrainedIterator constrained_begin(
       typename TensorType::DimensionsType& coords) {
@@ -479,7 +484,7 @@ class Tensor {
   }
 
   Tensor<ValueType, TensorType> slice(size_t dimensionIndex,
-                                      size_t fixedDimensionValue) {
+                                      size_t fixedDimensionValue) const {
     assert(dimensionIndex <= rank() &&
            fixedDimensionValue <= sizes[dimensionIndex]);
     Tensor<ValueType, TensorType> sliced;

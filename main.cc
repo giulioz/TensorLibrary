@@ -61,6 +61,23 @@ void sharingTest() {
   printTensor(t2);
   assertTensorValues(t2, "9, 9, 12, 9, \n");
 
+  Tensor<int> t3 = t1;
+  t3[{0, 1}] = 12;
+  printTensor(t1);
+  assertTensorValues(t1, "9, 9, 12, 9, \n");
+
+  std::cout << std::endl;
+}
+
+void sliceTest() {
+  std::cout << "Slicing Test: " << std::endl;
+  auto t1 = genTensor();
+  Tensor<int> t2 = t1.slice(1, 1);
+  // printTensor(t1);
+  // assertTensorValues(t1, "9, 9, 9, 9, \n");
+  // printTensor(t2);
+  // assertTensorValues(t2, "9, 9 \n");
+
   std::cout << std::endl;
 }
 
@@ -127,6 +144,7 @@ int main() {
 
   fixedRankTest();
   sharingTest();
+  sliceTest();
 
   return 0;
 }
