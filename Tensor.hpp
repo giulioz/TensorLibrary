@@ -11,6 +11,8 @@
 #include <tuple>
 #include <vector>
 
+#include <iostream>
+
 namespace TensorLib {
 
 // Placeholder for Constrained Iterator
@@ -182,9 +184,13 @@ class Iterator {
         currentPos(move.currentPos),
         fixedStride(move.fixedStride) {}
 
-  auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
+  auto& operator*() {
+    return ITType::getElementRef(tensor, currentPos + tensor.offset);
+  }
 
-  auto* operator-> () { return &ITType::getElementRef(tensor, currentPos); }
+  auto* operator-> () {
+    return &ITType::getElementRef(tensor, currentPos + tensor.offset);
+  }
 
   auto& operator[](const difference_type& n) {
     return ITType::getElementRef(tensor, n);
@@ -263,6 +269,9 @@ class Iterator {
 
 template <typename ValueType, typename TensorType>
 class Tensor {
+  template <typename>
+  friend class Iterator;
+
  private:
   using StandardIterator = Iterator<
       typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
@@ -281,11 +290,16 @@ class Tensor {
   typename TensorType::StridesType strides;
   typename TensorType::SizesType sizes;
   size_t _totalItems;
+  size_t offset;
+
+  // Empty Constructor
+  Tensor() {}
 
  public:
   // Public Constructors
 
-  Tensor(typename TensorType::InitializerDimensionsType sizes) : sizes(sizes) {
+  Tensor(typename TensorType::InitializerDimensionsType sizes)
+      : sizes(sizes), offset(0) {
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
@@ -293,7 +307,8 @@ class Tensor {
   }
 
   template <typename... Sizes>
-  Tensor(Sizes... sizes) : sizes(DimsInitType{static_cast<size_t>(sizes)...}) {
+  Tensor(Sizes... sizes)
+      : sizes(DimsInitType{static_cast<size_t>(sizes)...}), offset(0) {
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
     InternalUtils::calcStrides(this->sizes, strides);
@@ -305,14 +320,36 @@ class Tensor {
       : data(copy.data),
         strides(copy.strides),
         sizes(copy.sizes),
-        _totalItems(copy._totalItems) {}
+        _totalItems(copy._totalItems),
+        offset(copy.offset) {}
 
   // Move Constructor
-  Tensor(const Tensor&& move)
-      : data(move.data),
-        strides(move.strides),
-        sizes(move.sizes),
-        _totalItems(move._totalItems) {}
+  Tensor(Tensor&& move)
+      : data(std::move(move.data)),
+        strides(std::move(move.strides)),
+        sizes(std::move(move.sizes)),
+        _totalItems(move._totalItems),
+        offset(move.offset) {}
+
+  Tensor<ValueType, TensorType>& operator=(
+      const Tensor<ValueType, TensorType>& copy) {
+    data = copy.data;
+    strides = copy.strides;
+    sizes = copy.sizes;
+    offset = copy.offset;
+    _totalItems = copy._totalItems;
+    return *this;
+  };
+
+  Tensor<ValueType, TensorType>& operator=(
+      Tensor<ValueType, TensorType>&& move) {
+    data = std::move(move.data);
+    strides = std::move(move.strides);
+    sizes = std::move(move.sizes);
+    offset = move.offset;
+    _totalItems = move._totalItems;
+    return *this;
+  };
 
   //
   // Info Getters
@@ -425,6 +462,41 @@ class Tensor {
     auto index = InternalUtils::coordsToIndex(coords, strides);
     return (*data).at(index);
   }
+
+  //
+  // Slicing and copying
+  //
+
+  Tensor<ValueType, TensorType> clone() const {
+    Tensor<ValueType, TensorType> building;
+    building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
+                                                             (*data).cend());
+    building.strides = strides;
+    building.sizes = sizes;
+    building.offset = offset;
+    building._totalItems = _totalItems;
+    return building;
+  }
+
+  Tensor<ValueType, TensorType> slice(size_t dimensionIndex,
+                                      size_t fixedDimensionValue) {
+    assert(dimensionIndex <= rank() &&
+           fixedDimensionValue <= sizes[dimensionIndex]);
+    Tensor<ValueType, TensorType> sliced;
+    sliced.sizes.insert(sizes.end(), sizes.begin(),
+                        sizes.begin() + dimensionIndex);
+    sliced.sizes.insert(sizes.end(), sizes.begin() + dimensionIndex + 1,
+                        sizes.end());
+    sliced.strides.insert(sizes.end(), sizes.begin(),
+                          sizes.begin() + dimensionIndex);
+    sliced.strides.insert(sizes.end(), sizes.begin() + dimensionIndex + 1,
+                          sizes.end());
+    sliced.data = data;
+    sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
+    return sliced;
+  }
+
+  Tensor<ValueType, TensorType> flatten() {}
 };
 
 }  // namespace TensorLib

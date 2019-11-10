@@ -1,26 +1,25 @@
 #include <iostream>
+#include <sstream>
+#include <string>
 
 #include "Tensor.hpp"
 
 using namespace TensorLib;
 
 template <class TensorType>
-void printTensor(TensorType& t) {
+void printTensor(TensorType& t, std::ostream& stream = std::cout) {
   for (auto iterator = t.cbegin(); iterator < t.cend(); iterator++) {
-    std::cout << *iterator << ", ";
+    stream << *iterator << ", ";
   }
 
-  std::cout << std::endl;
+  stream << std::endl;
 }
 
-template <class TensorType, class DimensionsType>
-void printTensor(TensorType& t, DimensionsType& indexList) {
-  for (auto iterator = t.constrained_begin(indexList);
-       iterator < t.constrained_end(indexList); iterator++) {
-    std::cout << *iterator << ", ";
-  }
-
-  std::cout << std::endl;
+template <class TensorType>
+void assertTensorValues(TensorType tensor, std::string expected) {
+  std::stringstream buffer;
+  printTensor(tensor, buffer);
+  assert(buffer.str().compare(expected) == 0);
 }
 
 void fixedRankTest() {
@@ -31,6 +30,7 @@ void fixedRankTest() {
   tensor[{0, 1}] = 12;
   tensor[{1, 1}] = 22;
   printTensor(tensor);
+  assertTensorValues(tensor, "11, 21, 12, 22, \n");
 
   auto it = tensor.constrained_begin({1, VARIABLE_INDEX});
   auto end = tensor.constrained_end({1, VARIABLE_INDEX});
@@ -39,6 +39,29 @@ void fixedRankTest() {
     it++;
   }
   printTensor(tensor);
+  assertTensorValues(tensor, "11, 121, 12, 122, \n");
+
+  std::cout << std::endl;
+}
+
+Tensor<int> genTensor() {
+  Tensor<int> t1(2, 2);
+  std::fill(t1.begin(), t1.end(), 9);
+  return t1;
+}
+
+void sharingTest() {
+  std::cout << "Sharing Test: " << std::endl;
+  auto t1 = genTensor();
+  Tensor<int> t2 = t1.clone();
+
+  t2[{0, 1}] = 12;
+  printTensor(t1);
+  assertTensorValues(t1, "9, 9, 9, 9, \n");
+  printTensor(t2);
+  assertTensorValues(t2, "9, 9, 12, 9, \n");
+
+  std::cout << std::endl;
 }
 
 int main() {
@@ -103,6 +126,7 @@ int main() {
   std::cout << std::endl;
 
   fixedRankTest();
+  sharingTest();
 
   return 0;
 }
