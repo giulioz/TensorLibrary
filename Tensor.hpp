@@ -11,8 +11,6 @@
 #include <tuple>
 #include <vector>
 
-#include <iostream>
-
 namespace TensorLib {
 
 // Placeholder for Constrained Iterator
@@ -33,6 +31,7 @@ struct TensorTypeFixedRank {
   using SizesType = std::array<size_t, Rank>;
   using DimensionsType = const std::array<size_t, Rank>&;
   using InitializerDimensionsType = const std::array<size_t, Rank>&;
+  static constexpr auto rank = Rank;
 };
 
 // Forward Declarations
@@ -74,7 +73,7 @@ void calcStrides(const CoordsType& dimensions, std::vector<size_t>& strides) {
   for (auto&& dim : dimensions) {
     strides.push_back(stride);
     stride *= dim;
-    i++;
+    ++i;
   }
 }
 
@@ -86,7 +85,7 @@ void calcStrides(const CoordsType& dimensions,
   for (auto&& dim : dimensions) {
     strides[i] = stride;
     stride *= dim;
-    i++;
+    ++i;
   }
 }
 
@@ -128,7 +127,7 @@ struct IteratorTypeStandard {
   using ReturnType = ITValueType;
   using InternalTensorRef = Tensor<ValueType, TensorType>&;
 
-  static ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
+  static inline ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
     return tensor.at(pos);
   }
 };
@@ -140,7 +139,7 @@ struct IteratorTypeConst {
   using ReturnType = const ITValueType;
   using InternalTensorRef = const Tensor<ValueType, TensorType>&;
 
-  static const ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
+  static inline const ValueType& getElementRef(InternalTensorRef& tensor, size_t pos) {
     return tensor.c_at(pos);
   }
 };
@@ -265,7 +264,8 @@ class Iterator {
 
 template <typename ValueType, typename TensorType>
 class Tensor {
- private:
+//  private:
+ public:
   using StandardIterator = Iterator<
       typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
   using ConstIterator = Iterator<
@@ -287,7 +287,7 @@ class Tensor {
 
   // Empty Constructor
   Tensor()
-      : data(std::make_shared<std::vector<ValueType>>(0)),
+      : data(std::make_shared<std::vector<ValueType>>()),
         strides(0),
         sizes(0),
         _totalItems(0),
@@ -356,21 +356,21 @@ class Tensor {
   //
 
   size_t rank() const { return sizes.size(); }
-  size_t totalItemsCount() const { return _totalItems; }
-  size_t itemsCountAt(size_t dimension) const { return sizes.at(dimension); }
+  size_t size() const { return _totalItems; }
+  size_t sizeAt(size_t dimension) const { return sizes.at(dimension); }
 
   //
   // Iterators Initializers
   //
 
-  StandardIterator begin() {
-    return StandardIterator(*this, 0, strides[0]);
+  StandardIterator begin() { return StandardIterator(*this, 0, strides[0]); }
+  StandardIterator end() {
+    return StandardIterator(*this, _totalItems * strides[0]);
   }
-  StandardIterator end() { return StandardIterator(*this, _totalItems * strides[0]); }
-  ConstIterator cbegin() const {
-    return ConstIterator(*this, 0, strides[0]);
+  ConstIterator cbegin() const { return ConstIterator(*this, 0, strides[0]); }
+  ConstIterator cend() const {
+    return ConstIterator(*this, _totalItems * strides[0]);
   }
-  ConstIterator cend() const { return ConstIterator(*this, _totalItems * strides[0]); }
 
   ConstrainedIterator constrained_begin(
       typename TensorType::DimensionsType& coords) {
@@ -486,10 +486,9 @@ class Tensor {
   }
 
   // Clones the tensor sharing data
-  Tensor<ValueType, TensorType> fullWindow() const {
+  Tensor<ValueType, TensorType> share() const {
     Tensor<ValueType, TensorType> building;
-    building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
-                                                             (*data).cend());
+    building.data = data;
     building.strides = strides;
     building.sizes = sizes;
     building.offset = offset;
@@ -498,12 +497,15 @@ class Tensor {
   }
 
   // Returns a slice of the tensor
-  Tensor<ValueType, TensorType> slice(size_t dimensionIndex,
+  Tensor<ValueType, TensorTypeDynamicRank> slice(size_t dimensionIndex,
                                       size_t fixedDimensionValue) const {
     assert(dimensionIndex < rank() &&
            fixedDimensionValue <= sizes[dimensionIndex]);
 
-    Tensor<ValueType, TensorType> sliced;
+    Tensor<ValueType, TensorTypeDynamicRank> sliced;
+    sliced.data = data;
+    sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
+
     sliced.sizes.insert(sliced.sizes.end(), sizes.begin(),
                         sizes.begin() + dimensionIndex);
     sliced.sizes.insert(sliced.sizes.end(), sizes.begin() + dimensionIndex + 1,
@@ -512,14 +514,59 @@ class Tensor {
                           strides.begin() + dimensionIndex);
     sliced.strides.insert(sliced.strides.end(),
                           strides.begin() + dimensionIndex + 1, strides.end());
+    sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
+
+    return sliced;
+  }
+  Tensor<ValueType, TensorTypeFixedRank<TensorType::rank - 1>> slice(size_t dimensionIndex,
+                                      size_t fixedDimensionValue) const {
+    assert(dimensionIndex < rank() &&
+           fixedDimensionValue <= sizes[dimensionIndex]);
+
+    Tensor<ValueType, TensorTypeFixedRank<TensorType::rank - 1>> sliced;
     sliced.data = data;
     sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
+
+    sliced.sizes.insert(sliced.sizes.end(), sizes.begin(),
+                        sizes.begin() + dimensionIndex);
+    sliced.sizes.insert(sliced.sizes.end(), sizes.begin() + dimensionIndex + 1,
+                        sizes.end());
+    sliced.strides.insert(sliced.strides.end(), strides.begin(),
+                          strides.begin() + dimensionIndex);
+    sliced.strides.insert(sliced.strides.end(),
+                          strides.begin() + dimensionIndex + 1, strides.end());
     sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
 
     return sliced;
   }
 
-  Tensor<ValueType, TensorType> flatten() {}
+  // We can't return a fixed rank vector, since we can't know the resulting rank
+  Tensor<ValueType, TensorTypeDynamicRank> flatten(size_t start, size_t end) const {
+    assert(start <= strides.size() &&
+           end <= strides.size());
+    assert(start <= sizes.size() &&
+           end <= sizes.size());
+
+    Tensor<ValueType, TensorTypeDynamicRank> flatted;
+    flatted.data = data;
+    flatted.offset = offset;
+    flatted._totalItems = _totalItems;
+
+    flatted.strides.insert(flatted.strides.end(), strides.begin(),
+                         strides.begin() + start);
+    flatted.strides.insert(flatted.strides.end(), strides.begin() + end,
+                         strides.end());
+    flatted.sizes.insert(flatted.sizes.end(), sizes.begin(),
+                        sizes.begin() + start);
+    flatted.sizes.insert(flatted.sizes.end(), sizes.begin() + end,
+                         sizes.end());
+
+    for (size_t i = start; i != end; ++i) {
+      flatted.sizes.at(start) *= sizes[i];
+    }
+
+    return flatted;
+  }
 };
 
 }  // namespace TensorLib
