@@ -44,15 +44,10 @@ void fixedRankTest() {
   std::cout << std::endl;
 }
 
-Tensor<int> genTensor() {
-  Tensor<int> t1(2, 2);
-  std::fill(t1.begin(), t1.end(), 9);
-  return t1;
-}
-
 void sharingTest() {
   std::cout << "Sharing Test: " << std::endl;
-  auto t1 = genTensor();
+  Tensor<int> t1(2, 2);
+  std::fill(t1.begin(), t1.end(), 9);
   Tensor<int> t2 = t1.clone();
 
   t2[{0, 1}] = 12;
@@ -64,7 +59,9 @@ void sharingTest() {
   Tensor<int> t3 = t1;
   t3[{0, 1}] = 12;
   printTensor(t1);
-  assertTensorValues(t1, "9, 9, 12, 9, \n");
+  assertTensorValues(t1, "9, 9, 9, 9, \n");
+  printTensor(t3);
+  assertTensorValues(t3, "9, 9, 12, 9, \n");
 
   std::cout << std::endl;
 }
@@ -85,19 +82,30 @@ void sliceTest() {
   printTensor(t1);
   assertTensorValues(t1, "0, 1, 2, 3, \n");
 
+  std::cout << "Slice (1,1)" << std::endl;
   Tensor<int> t2 = t1.slice(1, 1);
   printTensor(t2);
-  // assertTensorValues(t2, "2, 3, \n");
+  std::cout << "Slice (1,0)" << std::endl;
+  assertTensorValues(t2, "2, 3, \n");
   Tensor<int> t3 = t1.slice(1, 0);
   printTensor(t3);
-  // assertTensorValues(t3, "0, 1, \n");
+  std::cout << "Slice (0,0)" << std::endl;
+  assertTensorValues(t3, "0, 1, \n");
   Tensor<int> t4 = t1.slice(0, 0);
   printTensor(t4);
+  std::cout << "Slice (0,1)" << std::endl;
+  Tensor<int> t5 = t1.slice(0, 1);
+  printTensor(t5);
 
   std::cout << std::endl;
+
+  // TODO: test with higher rank
 }
 
 int main() {
+  auto dims = std::array{2, 2};
+  Tensor<int> t0(dims);
+
   Tensor<int> tensor({2, 4, 2});
 
   tensor[{0, 0, 0}] = 111;

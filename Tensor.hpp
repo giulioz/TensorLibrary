@@ -184,13 +184,9 @@ class Iterator {
         currentPos(move.currentPos),
         fixedStride(move.fixedStride) {}
 
-  auto& operator*() {
-    return ITType::getElementRef(tensor, currentPos + tensor.offset);
-  }
+  auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
 
-  auto* operator-> () {
-    return &ITType::getElementRef(tensor, currentPos + tensor.offset);
-  }
+  auto* operator-> () { return &ITType::getElementRef(tensor, currentPos); }
 
   auto& operator[](const difference_type& n) {
     return ITType::getElementRef(tensor, n);
@@ -269,9 +265,6 @@ class Iterator {
 
 template <typename ValueType, typename TensorType>
 class Tensor {
-  template <typename>
-  friend class Iterator;
-
  private:
   using StandardIterator = Iterator<
       typename InternalUtils::IteratorTypeStandard<ValueType, TensorType>>;
@@ -303,8 +296,8 @@ class Tensor {
  public:
   // Public Constructors
 
-  Tensor(typename TensorType::InitializerDimensionsType sizes)
-      : sizes(sizes), offset(0) {
+  template <typename T>
+  Tensor(T sizes) : sizes(sizes.begin(), sizes.end()), offset(0) {
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
@@ -322,7 +315,8 @@ class Tensor {
 
   // Copy Constructor
   Tensor(const Tensor& copy)
-      : data(copy.data),
+      : data(std::make_shared<std::vector<ValueType>>((*copy.data).cbegin(),
+                                                      (*copy.data).cend())),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
@@ -338,7 +332,8 @@ class Tensor {
 
   Tensor<ValueType, TensorType>& operator=(
       const Tensor<ValueType, TensorType>& copy) {
-    data = copy.data;
+    data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
+                                                    (*data).cend());
     strides = copy.strides;
     sizes = copy.sizes;
     offset = copy.offset;
@@ -368,10 +363,14 @@ class Tensor {
   // Iterators Initializers
   //
 
-  StandardIterator begin() { return StandardIterator(*this); }
-  StandardIterator end() { return StandardIterator(*this, _totalItems); }
-  ConstIterator cbegin() const { return ConstIterator(*this); }
-  ConstIterator cend() const { return ConstIterator(*this, _totalItems); }
+  StandardIterator begin() {
+    return StandardIterator(*this, 0, strides[0]);
+  }
+  StandardIterator end() { return StandardIterator(*this, _totalItems * strides[0]); }
+  ConstIterator cbegin() const {
+    return ConstIterator(*this, 0, strides[0]);
+  }
+  ConstIterator cend() const { return ConstIterator(*this, _totalItems * strides[0]); }
 
   ConstrainedIterator constrained_begin(
       typename TensorType::DimensionsType& coords) {
@@ -476,6 +475,18 @@ class Tensor {
 
   // Clones the tensor without sharing data
   Tensor<ValueType, TensorType> clone() const {
+    Tensor<ValueType, TensorType> building;
+    building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
+                                                             (*data).cend());
+    building.strides = strides;
+    building.sizes = sizes;
+    building.offset = offset;
+    building._totalItems = _totalItems;
+    return building;
+  }
+
+  // Clones the tensor sharing data
+  Tensor<ValueType, TensorType> fullWindow() const {
     Tensor<ValueType, TensorType> building;
     building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
                                                              (*data).cend());
