@@ -29,15 +29,15 @@ std::cout << tensor[0]; // prints 2
 Dimensions are fixed, and cannot be changed without recreating the tensor. For efficency and index safety, you can also set a fixed rank at compile time:
 
 ```cpp
-TensorLib::Tensor<int, TensorLib::TensorTypeFixedRank<2>> t1(2, 2);
+TensorLib::Tensor<int, 2> t1(2, 2);
 std::cout << t1[{2, 1}]; // ok
 std::cout << t1[{2, 1, 5}]; // compiler error
 
 // compiler error
-TensorLib::Tensor<int, TensorLib::TensorTypeFixedRank<2>> t2(2, 2, 5);
+TensorLib::Tensor<int, 2> t2(2, 2, 5);
 ```
 
-While rank can be checked in compile-time (using `TensorTypeFixedRank`), dimensions aren't known, so you can only find out of bounds errors in runtime (they are asserted and checked, when using the iterator or method `at`).
+While rank can be checked in compile-time (using the `Tensor<type,rank>` syntax), dimensions aren't known, so you can only find out of bounds errors in runtime (they are asserted and checked, when using the iterator or method `at`).
 
 A Tensor automatically manages memory, behaving like a std::vector, deallocating data on the end of the stack object lifetime. Copy, assignment and `clone()` method produces clones of the Tensor, which does not share data. If you want to have data shared, you can use the `share()` method, which create a copy of the tensor that shares the data;
 
@@ -116,7 +116,7 @@ Tensor<int> t4 = t1.slice(0, 0);
 // Will contain (0, 2)
 ```
 
-The rank of the resulting tensor is equal to the rank of the previous tensor -1. Since we can make 
+The rank of the resulting tensor is equal to the rank of the previous tensor -1. Since we can make
 
 Strides are kept in left-most manner.
 

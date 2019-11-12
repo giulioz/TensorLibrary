@@ -11,14 +11,19 @@
 #include <tuple>
 #include <vector>
 
+#include <iostream>
+
 namespace TensorLib {
 
-// Placeholder for Constrained Iterator
+// Placeholder for Constrained Iterator and Dynamic Tensor
 extern const size_t VARIABLE_INDEX;
 
+// extern const int DYNAMIC_TENSOR;
+const int DYNAMIC_TENSOR = -1;
+
 // Forward Declarations
-// Rank -1 = Dynamic
-template <typename ValueType, int Rank = -1>
+// Rank DYNAMIC_TENSOR = Dynamic
+template <typename ValueType, int Rank = DYNAMIC_TENSOR>
 class Tensor;
 
 namespace InternalUtils {
@@ -248,16 +253,16 @@ class Iterator {
 };
 
 template <typename ValueType>
-class Tensor<ValueType, -1> {
+class Tensor<ValueType, DYNAMIC_TENSOR> {
  private:
-  using StandardIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, -1>>;
-  using ConstIterator =
-      Iterator<typename InternalUtils::IteratorTypeConst<ValueType, -1>>;
-  using ConstrainedIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, -1>>;
-  using ConstrainedConstIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, -1>>;
+  using StandardIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
+  using ConstIterator = Iterator<
+      typename InternalUtils::IteratorTypeConst<ValueType, DYNAMIC_TENSOR>>;
+  using ConstrainedIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
+  using ConstrainedConstIterator = Iterator<
+      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
 
   using StridesType = std::vector<size_t>;
   using SizesType = std::vector<size_t>;
@@ -303,8 +308,8 @@ class Tensor<ValueType, -1> {
   // Copy Constructor
   template <int Rank>
   Tensor(const Tensor<ValueType, Rank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>((*copy.data).cbegin(),
-                                                      (*copy.data).cend())),
+      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
+                                                      (*(copy.data)).cend())),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
@@ -321,8 +326,9 @@ class Tensor<ValueType, -1> {
 
   template <int Rank>
   Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
-    data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
-                                                    (*data).cend());
+    data = std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
+                                                    (*(copy.data)).cend());
+
     strides = copy.strides;
     sizes = copy.sizes;
     offset = copy.offset;
@@ -459,8 +465,8 @@ class Tensor<ValueType, -1> {
   //
 
   // Clones the tensor without sharing data
-  Tensor<ValueType, -1> clone() const {
-    Tensor<ValueType, -1> building;
+  Tensor<ValueType, DYNAMIC_TENSOR> clone() const {
+    Tensor<ValueType, DYNAMIC_TENSOR> building;
     building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
                                                              (*data).cend());
     building.strides = strides;
@@ -471,8 +477,8 @@ class Tensor<ValueType, -1> {
   }
 
   // Clones the tensor sharing data
-  Tensor<ValueType, -1> share() const {
-    Tensor<ValueType, -1> building;
+  Tensor<ValueType, DYNAMIC_TENSOR> share() const {
+    Tensor<ValueType, DYNAMIC_TENSOR> building;
     building.data = data;
     building.strides = strides;
     building.sizes = sizes;
@@ -482,12 +488,12 @@ class Tensor<ValueType, -1> {
   }
 
   // Returns a slice of the tensor
-  Tensor<ValueType, -1> slice(size_t dimensionIndex,
-                              size_t fixedDimensionValue) const {
+  Tensor<ValueType, DYNAMIC_TENSOR> slice(size_t dimensionIndex,
+                                          size_t fixedDimensionValue) const {
     assert(dimensionIndex < rank() &&
            fixedDimensionValue <= sizes[dimensionIndex]);
 
-    Tensor<ValueType, -1> sliced;
+    Tensor<ValueType, DYNAMIC_TENSOR> sliced;
     sliced.data = data;
     sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
 
@@ -504,11 +510,11 @@ class Tensor<ValueType, -1> {
     return sliced;
   }
 
-  Tensor<ValueType, -1> flatten(size_t start, size_t end) const {
+  Tensor<ValueType, DYNAMIC_TENSOR> flatten(size_t start, size_t end) const {
     assert(start <= strides.size() && end <= strides.size());
     assert(start <= sizes.size() && end <= sizes.size());
 
-    Tensor<ValueType, -1> flatted;
+    Tensor<ValueType, DYNAMIC_TENSOR> flatted;
     flatted.data = data;
     flatted.offset = offset;
     flatted._totalItems = _totalItems;
@@ -787,11 +793,11 @@ class Tensor {
   }
 
   // We can't return a fixed rank vector, since we can't know the resulting rank
-  Tensor<ValueType, -1> flatten(size_t start, size_t end) const {
+  Tensor<ValueType, DYNAMIC_TENSOR> flatten(size_t start, size_t end) const {
     assert(start <= strides.size() && end <= strides.size());
     assert(start <= sizes.size() && end <= sizes.size());
 
-    Tensor<ValueType, -1> flatted;
+    Tensor<ValueType, DYNAMIC_TENSOR> flatted;
     flatted.data = data;
     flatted.offset = offset;
     flatted._totalItems = _totalItems;
