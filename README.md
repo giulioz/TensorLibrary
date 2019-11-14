@@ -135,3 +135,17 @@ Tensor<int> t3 = t1.flatten(0, 1);
 ```
 
 The flattened tensor does not maintain the rank of the derivating tensor but it shares the same data.
+
+# Mail
+
+Good morning,
+
+Our solution to the first assignement of Advanced algorithms and programming methods [CM0470] is attached.
+A description on how to interact with the Tensor Library is present in the README file.
+We made the following design choises:
+
+- DYNAMIC and FIXED VALUE tensors
+  To enable the user to make compile-time type checking
+
+Baccega Sandro 865024,
+Zausa Giulio 870040

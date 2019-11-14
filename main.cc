@@ -118,6 +118,15 @@ void sliceTest() {
 
   std::cout << std::endl;
 
+  std::cout << "Constrained Test: " << std::endl;
+  auto it = th2.constrained_cbegin({VARIABLE_INDEX, 1});
+  auto end = th2.constrained_cend({VARIABLE_INDEX, 1});
+  while (it < end) {
+    std::cout << *it << " ";
+    it++;
+  }
+  std::cout << std::endl;
+
   // TODO: test with double sliced tensor
 }
 
@@ -169,6 +178,15 @@ void flattenTest() {
   // }
   std::cout << std::endl;
   printTensor(t4);
+
+  std::cout << "Constrained Test: " << std::endl;
+  auto it = t4.constrained_cbegin({0, VARIABLE_INDEX, 1});
+  auto end = t4.constrained_cend({0, VARIABLE_INDEX, 1});
+  while (it < end) {
+    std::cout << *it << " ";
+    it++;
+  }
+  std::cout << std::endl;
 }
 
 int main() {
