@@ -324,13 +324,24 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
   // Copy Constructor
   template <int Rank>
   Tensor(const Tensor<ValueType, Rank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
-                                                      (*(copy.data)).cend())),
+      : data(std::make_shared<std::vector<ValueType>>(
+            std::vector<ValueType>(*copy.data))),
+        strides(copy.strides.cbegin(), copy.strides.cend()),
+        sizes(copy.sizes.cbegin(), copy.sizes.cend()),
+        _totalItems(copy._totalItems),
+        offset(copy.offset) {
+    std::cout << "CALLED: COPY CTOR SIZED" << std::endl;
+  }
+
+  // Copy Constructor
+  Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
+      : data(std::make_shared<std::vector<ValueType>>(
+            std::vector<ValueType>(*copy.data))),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
         offset(copy.offset) {
-    std::cout << "CALLED: COPY CTOR" << std::endl;
+    std::cout << "CALLED: COPY CTOR DYN" << std::endl;
   }
 
   // Move Constructor
@@ -341,15 +352,24 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         sizes(move.sizes.cbegin(), move.sizes.cend()),
         _totalItems(move._totalItems),
         offset(move.offset) {
-    std::cout << "CALLED: MOVE CTOR" << std::endl;
+    std::cout << "CALLED: MOVE CTOR SIZED" << std::endl;
   }
 
-  template <int Rank>
-  Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
-    std::cout << "CALLED: COPY EQUAL" << std::endl;
-    data = std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
-                                                    (*(copy.data)).cend());
+  // Move Constructor
+  Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
+      : data(std::move(move.data)),
+        strides(move.strides.cbegin(), move.strides.cend()),
+        sizes(move.sizes.cbegin(), move.sizes.cend()),
+        _totalItems(move._totalItems),
+        offset(move.offset) {
+    std::cout << "CALLED: MOVE CTOR DYN" << std::endl;
+  }
 
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
+      const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy) {
+    std::cout << "CALLED: COPY EQUAL DYN" << std::endl;
+    data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(*copy.data));
     strides = copy.strides;
     sizes = copy.sizes;
     offset = copy.offset;
@@ -357,9 +377,9 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
     return *this;
   }
 
-  template <int Rank>
-  Tensor<ValueType, Rank>& operator=(Tensor<ValueType, Rank>&& move) {
-    std::cout << "CALLED: MOVE EQUAL" << std::endl;
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
+      Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move) {
+    std::cout << "CALLED: MOVE EQUAL DYN" << std::endl;
     data = std::move(move.data);
     strides = std::move(move.strides);
     sizes = std::move(move.sizes);
@@ -491,8 +511,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
     std::cout << "CALLED: CLONE" << std::endl;
 
     Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
-    building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
-                                                             (*data).cend());
+    building.data = std::make_shared<std::vector<ValueType>>(*data);
     building.strides = strides;
     building.sizes = sizes;
     building.offset = offset;
@@ -636,8 +655,8 @@ class Tensor {
 
   // Copy Constructor
   Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
-      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
-                                                      (*(copy.data)).cend())),
+      : data(std::make_shared<std::vector<ValueType>>(
+            std::vector<ValueType>(*copy.data))),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
@@ -648,8 +667,8 @@ class Tensor {
 
   // Copy Constructor
   Tensor(const Tensor<ValueType, Rank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
-                                                      (*(copy.data)).cend())),
+      : data(std::make_shared<std::vector<ValueType>>(
+            std::vector<ValueType>(*copy.data))),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
@@ -679,8 +698,8 @@ class Tensor {
   }
 
   Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
-    data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
-                                                    (*data).cend());
+    data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(*copy.data));
     strides = copy.strides;
     sizes = copy.sizes;
     offset = copy.offset;
@@ -822,8 +841,7 @@ class Tensor {
     std::cout << "CALLED: CLONE" << std::endl;
 
     Tensor<ValueType, Rank> building;
-    building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
-                                                             (*data).cend());
+    building.data = std::make_shared<std::vector<ValueType>>(*data);
     building.strides = strides;
     building.sizes = sizes;
     building.offset = offset;

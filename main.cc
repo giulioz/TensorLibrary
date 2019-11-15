@@ -7,7 +7,7 @@
 using namespace TensorLib;
 
 template <class TensorType>
-void printTensor(TensorType& t, std::ostream& stream = std::cout) {
+void printTensor(const TensorType& t, std::ostream& stream = std::cout) {
   for (auto iterator = t.cbegin(); iterator < t.cend(); iterator++) {
     stream << *iterator << ", ";
   }
@@ -16,7 +16,7 @@ void printTensor(TensorType& t, std::ostream& stream = std::cout) {
 }
 
 template <class TensorType>
-void assertTensorValues(TensorType tensor, std::string expected) {
+void assertTensorValues(const TensorType& tensor, std::string expected) {
   std::stringstream buffer;
   printTensor(tensor, buffer);
   assert(buffer.str().compare(expected) == 0);
@@ -69,7 +69,9 @@ void sharingTest() {
 
   Tensor t4 = t3.share();
   *t4.begin() = 100;
+  printTensor(t3);
   assertTensorValues(t3, "100, 9, 12, 9, \n");
+  printTensor(t4);
   assertTensorValues(t4, "100, 9, 12, 9, \n");
   assertTensorValues(t1, "9, 9, 9, 9, \n");
 
@@ -152,16 +154,6 @@ void flattenTest() {
 
   std::cout << "Flatten (0,1): " << std::endl;
   Tensor<int> t2 = t1.flatten(0, 1);
-  // printTensor(t2);
-  // std::cout << "Sizes t1: ";
-  // for (auto&& size : t1.sizes) {
-  //   std::cout << size << ", ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "Sizes t2: ";
-  // for (auto&& size : t2.sizes) {
-  //   std::cout << size << ", ";
-  // }
   std::cout << std::endl;
 
   Tensor<int> t3 = Tensor<int>::buildTensor(2, 2, 2, 2);
@@ -175,15 +167,6 @@ void flattenTest() {
 
   std::cout << "Flatten (1,2): " << std::endl;
   Tensor<int> t4 = t3.flatten(1, 2);
-  // std::cout << "Sizes t3: ";
-  // for (auto&& size : t3.sizes) {
-  //   std::cout << size << ", ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "Sizes t4: ";
-  // for (auto&& size : t4.sizes) {
-  //   std::cout << size << ", ";
-  // }
   std::cout << std::endl;
   printTensor(t4);
 
@@ -194,25 +177,41 @@ void flattenTest() {
     std::cout << *it << " ";
     it++;
   }
+
   std::cout << std::endl;
 }
 
 void creationTest() {
   std::cout << "Dynamic" << std::endl;
   Tensor<int> t0({2, 4, 6});
+
   std::cout << "Copy Dynamic" << std::endl;
-  Tensor<int> t1(t0);
+  Tensor<int> t1 = t0;
+  t1[0] = 100;
+  assert(t0[0] != 100);
+
+  std::cout << "Sized" << std::endl;
+  Tensor t100 = Tensor<int>::buildTensor(2, 4, 6);
+  std::cout << "Copy Sized-Dynamic" << std::endl;
+  Tensor<int> t101 = t100;
+  t101[0] = 100;
+  assert(t100[0] != 100);
+
   std::cout << "Move Dynamic" << std::endl;
   Tensor<int> t2 = std::move(t0);
 
+  std::cout << "Dynamic" << std::endl;
   Tensor<int> t3({2, 4, 6});
+  Tensor<int> t30({2, 4, 6});
   std::cout << "Copy Dynamic-Dynamic" << std::endl;
-  t3 = t0;
+  t3 = t30;
   std::cout << "Build fixed, move fixed" << std::endl;
   Tensor t4 = Tensor<int>::buildTensor(2, 4, 6);
 
   std::cout << "Fixed Initializer" << std::endl;
   Tensor t5 = Tensor<int, 3>({2, 4, 6});
+
+  std::cout << std::endl;
 }
 
 int main() {
