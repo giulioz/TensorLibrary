@@ -16,14 +16,12 @@
 namespace TensorLib {
 
 // Placeholder for Constrained Iterator and Dynamic Tensor
-extern const size_t VARIABLE_INDEX;
-
-// extern const int DYNAMIC_TENSOR;
-const int DYNAMIC_TENSOR = -1;
+inline constexpr size_t VARIABLE_INDEX = -1;
+inline constexpr int DYNAMIC_TENSOR_TAG = -1;
 
 // Forward Declarations
-// Rank DYNAMIC_TENSOR = Dynamic
-template <typename ValueType, int Rank = DYNAMIC_TENSOR>
+// Rank DYNAMIC_TENSOR_TAG = Dynamic
+template <typename ValueType, int Rank = DYNAMIC_TENSOR_TAG>
 class Tensor;
 
 namespace InternalUtils {
@@ -41,10 +39,10 @@ size_t coordsToIndex(const CoordsType& coords, const StridesType& strides) {
   return index;
 }
 
-size_t calcDataSize();
+inline constexpr size_t calcDataSize() { return 1; }
 
 template <typename... Args>
-size_t calcDataSize(size_t first, Args... args) {
+size_t calcDataSize(const size_t first, const Args... args) {
   return first * calcDataSize(args...);
 }
 
@@ -253,21 +251,26 @@ class Iterator {
 };
 
 template <typename ValueType>
-class Tensor<ValueType, DYNAMIC_TENSOR> {
+class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
+  template <typename, int>
+  friend class Tensor;
+
  private:
-  using StandardIterator = Iterator<
-      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
+  using StandardIterator =
+      Iterator<typename InternalUtils::IteratorTypeStandard<
+          ValueType, DYNAMIC_TENSOR_TAG>>;
   using ConstIterator = Iterator<
-      typename InternalUtils::IteratorTypeConst<ValueType, DYNAMIC_TENSOR>>;
-  using ConstrainedIterator = Iterator<
-      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
-  using ConstrainedConstIterator = Iterator<
-      typename InternalUtils::IteratorTypeStandard<ValueType, DYNAMIC_TENSOR>>;
+      typename InternalUtils::IteratorTypeConst<ValueType, DYNAMIC_TENSOR_TAG>>;
+  using ConstrainedIterator =
+      Iterator<typename InternalUtils::IteratorTypeStandard<
+          ValueType, DYNAMIC_TENSOR_TAG>>;
+  using ConstrainedConstIterator =
+      Iterator<typename InternalUtils::IteratorTypeStandard<
+          ValueType, DYNAMIC_TENSOR_TAG>>;
 
   using StridesType = std::vector<size_t>;
   using SizesType = std::vector<size_t>;
   using DimensionsType = const std::vector<size_t>&;
-  using InitializerDimensionsType = const std::initializer_list<size_t>&;
 
   // Internal Data
   std::shared_ptr<std::vector<ValueType>> data;
@@ -282,27 +285,40 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
         strides(0),
         sizes(0),
         _totalItems(0),
-        offset(0) {}
+        offset(0) {
+    std::cout << "CALLED: EMPTY CTOR" << std::endl;
+  }
 
  public:
-  // Public Constructors
+  // Builder static method with varidic sizes
+  // Static method because of overload resolution
+  template <typename... Sizes>
+  static Tensor<ValueType, sizeof...(Sizes)> buildTensor(Sizes... sizes) {
+    Tensor<ValueType, sizeof...(Sizes)> tensor;
 
-  template <typename T>
-  Tensor(T sizes) : sizes(sizes.begin(), sizes.end()), offset(0) {
+    tensor.sizes =
+        std::array<size_t, sizeof...(Sizes)>{static_cast<size_t>(sizes)...};
+    tensor.offset = 0;
+    tensor.data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
+    InternalUtils::calcStrides(tensor.sizes, tensor.strides);
+    tensor._totalItems = (*(tensor.data)).size();
+    std::cout << "CALLED: DYNAMIC SIZES CTOR" << std::endl;
+
+    return tensor;
+  }
+
+  //
+  // Public Constructors
+  //
+
+  Tensor(const std::initializer_list<size_t>& sizes)
+      : sizes(sizes.begin(), sizes.end()), offset(0) {
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = (*data).size();
-  }
-
-  template <typename... Sizes>
-  Tensor(Sizes... sizes)
-      : sizes(InitializerDimensionsType{static_cast<size_t>(sizes)...}),
-        offset(0) {
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
-    InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = (*data).size();
+    std::cout << "CALLED: SIZES CTOR" << std::endl;
   }
 
   // Copy Constructor
@@ -313,19 +329,24 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
-        offset(copy.offset) {}
+        offset(copy.offset) {
+    std::cout << "CALLED: COPY CTOR" << std::endl;
+  }
 
   // Move Constructor
   template <int Rank>
   Tensor(Tensor<ValueType, Rank>&& move)
       : data(std::move(move.data)),
-        strides(std::move(move.strides)),
-        sizes(std::move(move.sizes)),
+        strides(move.strides.cbegin(), move.strides.cend()),
+        sizes(move.sizes.cbegin(), move.sizes.cend()),
         _totalItems(move._totalItems),
-        offset(move.offset) {}
+        offset(move.offset) {
+    std::cout << "CALLED: MOVE CTOR" << std::endl;
+  }
 
   template <int Rank>
   Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
+    std::cout << "CALLED: COPY EQUAL" << std::endl;
     data = std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
                                                     (*(copy.data)).cend());
 
@@ -338,6 +359,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
 
   template <int Rank>
   Tensor<ValueType, Rank>& operator=(Tensor<ValueType, Rank>&& move) {
+    std::cout << "CALLED: MOVE EQUAL" << std::endl;
     data = std::move(move.data);
     strides = std::move(move.strides);
     sizes = std::move(move.sizes);
@@ -465,8 +487,10 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
   //
 
   // Clones the tensor without sharing data
-  Tensor<ValueType, DYNAMIC_TENSOR> clone() const {
-    Tensor<ValueType, DYNAMIC_TENSOR> building;
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG> clone() const {
+    std::cout << "CALLED: CLONE" << std::endl;
+
+    Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
     building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
                                                              (*data).cend());
     building.strides = strides;
@@ -477,8 +501,10 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
   }
 
   // Clones the tensor sharing data
-  Tensor<ValueType, DYNAMIC_TENSOR> share() const {
-    Tensor<ValueType, DYNAMIC_TENSOR> building;
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG> share() const {
+    std::cout << "CALLED: SHARE" << std::endl;
+
+    Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
     building.data = data;
     building.strides = strides;
     building.sizes = sizes;
@@ -488,12 +514,12 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
   }
 
   // Returns a slice of the tensor
-  Tensor<ValueType, DYNAMIC_TENSOR> slice(size_t dimensionIndex,
-                                          size_t fixedDimensionValue) const {
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG> slice(
+      size_t dimensionIndex, size_t fixedDimensionValue) const {
     assert(dimensionIndex < rank() &&
            fixedDimensionValue <= sizes[dimensionIndex]);
 
-    Tensor<ValueType, DYNAMIC_TENSOR> sliced;
+    Tensor<ValueType, DYNAMIC_TENSOR_TAG> sliced;
     sliced.data = data;
     sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
 
@@ -510,11 +536,13 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
     return sliced;
   }
 
-  Tensor<ValueType, DYNAMIC_TENSOR> flatten(size_t start, size_t end) const {
+  // Merge Strides
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatten(size_t start,
+                                                size_t end) const {
     assert(start <= strides.size() && end <= strides.size());
     assert(start <= sizes.size() && end <= sizes.size());
 
-    Tensor<ValueType, DYNAMIC_TENSOR> flatted;
+    Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatted;
     flatted.data = data;
     flatted.offset = offset;
     flatted._totalItems = _totalItems;
@@ -537,6 +565,9 @@ class Tensor<ValueType, DYNAMIC_TENSOR> {
 
 template <typename ValueType, int Rank>
 class Tensor {
+  template <typename, int>
+  friend class Tensor;
+
  private:
   using StandardIterator =
       Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, Rank>>;
@@ -562,69 +593,109 @@ class Tensor {
   // Empty Constructor
   Tensor()
       : data(std::make_shared<std::vector<ValueType>>()),
-        strides(0),
-        sizes(0),
         _totalItems(0),
-        offset(0) {}
+        offset(0) {
+    std::cout << "CALLED: EMPTY CTOR" << std::endl;
+  }
 
  public:
-  // Public Constructors
+  // Builder static method with varidic sizes
+  // Static method because of overload resolution
+  template <typename... Sizes>
+  static Tensor<ValueType, sizeof...(Sizes)> buildTensor(Sizes... sizes) {
+    static_assert(sizeof...(Sizes) == Rank);
 
-  template <typename T>
-  Tensor(T sizes) : sizes(sizes.begin(), sizes.end()), offset(0) {
+    Tensor<ValueType, sizeof...(Sizes)> tensor;
+
+    tensor.sizes =
+        std::array<size_t, sizeof...(Sizes)>{static_cast<size_t>(sizes)...};
+    tensor.offset = 0;
+    tensor.data = std::make_shared<std::vector<ValueType>>(
+        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
+    InternalUtils::calcStrides(tensor.sizes, tensor.strides);
+    tensor._totalItems = (*(tensor.data)).size();
+    std::cout << "CALLED: DYNAMIC SIZES CTOR" << std::endl;
+
+    return tensor;
+  }
+
+  //
+  // Public Constructors
+  //
+
+  Tensor(const std::initializer_list<size_t>& sizes) : offset(0) {
+    assert(sizes.size() == Rank);
+
+    std::copy(sizes.begin(), sizes.end(), this->sizes.begin());
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = (*data).size();
-  }
-
-  template <typename... Sizes>
-  Tensor(Sizes... sizes)
-      : sizes(InitializerDimensionsType{static_cast<size_t>(sizes)...}),
-        offset(0) {
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
-    InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = (*data).size();
+    std::cout << "CALLED: SIZES CTOR DYN" << std::endl;
   }
 
   // Copy Constructor
-  template <int TRank>
-  Tensor(const Tensor<ValueType, TRank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>((*copy.data).cbegin(),
-                                                      (*copy.data).cend())),
+  Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
+      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
+                                                      (*(copy.data)).cend())),
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
-        offset(copy.offset) {}
+        offset(copy.offset) {
+    assert(copy.rank() == Rank);
+    std::cout << "CALLED: COPY CTOR" << std::endl;
+  }
+
+  // Copy Constructor
+  Tensor(const Tensor<ValueType, Rank>& copy)
+      : data(std::make_shared<std::vector<ValueType>>((*(copy.data)).cbegin(),
+                                                      (*(copy.data)).cend())),
+        strides(copy.strides),
+        sizes(copy.sizes),
+        _totalItems(copy._totalItems),
+        offset(copy.offset) {
+    std::cout << "CALLED: COPY CTOR" << std::endl;
+  }
 
   // Move Constructor
-  template <int TRank>
-  Tensor(Tensor<ValueType, TRank>&& move)
+  Tensor(Tensor<ValueType, Rank>&& move)
       : data(std::move(move.data)),
-        strides(std::move(move.strides)),
-        sizes(std::move(move.sizes)),
+        strides(move.strides),
+        sizes(move.sizes),
         _totalItems(move._totalItems),
-        offset(move.offset) {}
+        offset(move.offset) {
+    std::cout << "CALLED: MOVE CTOR" << std::endl;
+  }
 
-  template <int TRank>
-  Tensor<ValueType, TRank>& operator=(const Tensor<ValueType, TRank>& copy) {
+  // Move Constructor
+  Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
+      : data(std::move(move.data)),
+        strides(move.strides),
+        sizes(move.sizes),
+        _totalItems(move._totalItems),
+        offset(move.offset) {
+    assert(move.rank() == Rank);
+    std::cout << "CALLED: MOVE CTOR" << std::endl;
+  }
+
+  Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
     data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
                                                     (*data).cend());
     strides = copy.strides;
     sizes = copy.sizes;
     offset = copy.offset;
     _totalItems = copy._totalItems;
+    std::cout << "CALLED: COPY EQUAL" << std::endl;
     return *this;
   }
 
-  template <int TRank>
-  Tensor<ValueType, TRank>& operator=(Tensor<ValueType, TRank>&& move) {
+  Tensor<ValueType, Rank>& operator=(Tensor<ValueType, Rank>&& move) {
     data = std::move(move.data);
-    strides = std::move(move.strides);
-    sizes = std::move(move.sizes);
+    strides = move.strides;
+    sizes = move.sizes;
     offset = move.offset;
     _totalItems = move._totalItems;
+    std::cout << "CALLED: MOVE EQUAL" << std::endl;
     return *this;
   }
 
@@ -632,7 +703,7 @@ class Tensor {
   // Info Getters
   //
 
-  constexpr size_t rank() { return Rank; }
+  constexpr size_t rank() const { return Rank; }
   size_t size() const { return _totalItems; }
   size_t sizeAt(size_t dimension) const { return sizes.at(dimension); }
 
@@ -748,6 +819,8 @@ class Tensor {
 
   // Clones the tensor without sharing data
   Tensor<ValueType, Rank> clone() const {
+    std::cout << "CALLED: CLONE" << std::endl;
+
     Tensor<ValueType, Rank> building;
     building.data = std::make_shared<std::vector<ValueType>>((*data).cbegin(),
                                                              (*data).cend());
@@ -760,6 +833,8 @@ class Tensor {
 
   // Clones the tensor sharing data
   Tensor<ValueType, Rank> share() const {
+    std::cout << "CALLED: SHARE" << std::endl;
+
     Tensor<ValueType, Rank> building;
     building.data = data;
     building.strides = strides;
@@ -779,25 +854,27 @@ class Tensor {
     sliced.data = data;
     sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
 
-    sliced.sizes.insert(sliced.sizes.end(), sizes.begin(),
-                        sizes.begin() + dimensionIndex);
-    sliced.sizes.insert(sliced.sizes.end(), sizes.begin() + dimensionIndex + 1,
-                        sizes.end());
-    sliced.strides.insert(sliced.strides.end(), strides.begin(),
-                          strides.begin() + dimensionIndex);
-    sliced.strides.insert(sliced.strides.end(),
-                          strides.begin() + dimensionIndex + 1, strides.end());
+    for (size_t index = 0; index < dimensionIndex; index++) {
+      sliced.strides[index] = strides[index];
+      sliced.sizes[index] = sizes[index];
+    }
+    for (size_t index = dimensionIndex + 1; index < strides.size(); index++) {
+      sliced.strides[index - 1] = strides[index];
+      sliced.sizes[index - 1] = sizes[index];
+    }
     sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
 
     return sliced;
   }
 
+  // Merge Strides
   // We can't return a fixed rank vector, since we can't know the resulting rank
-  Tensor<ValueType, DYNAMIC_TENSOR> flatten(size_t start, size_t end) const {
+  Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatten(size_t start,
+                                                size_t end) const {
     assert(start <= strides.size() && end <= strides.size());
     assert(start <= sizes.size() && end <= sizes.size());
 
-    Tensor<ValueType, DYNAMIC_TENSOR> flatted;
+    Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatted;
     flatted.data = data;
     flatted.offset = offset;
     flatted._totalItems = _totalItems;

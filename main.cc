@@ -24,7 +24,7 @@ void assertTensorValues(TensorType tensor, std::string expected) {
 
 void fixedRankTest() {
   std::cout << "Fixed Rank Test: " << std::endl;
-  Tensor<int, 2> tensor(2, 2);
+  Tensor<int, 2> tensor = Tensor<int>::buildTensor(2, 2);
   tensor[{0, 0}] = 11;
   tensor[{1, 0}] = 21;
   tensor[{0, 1}] = 12;
@@ -46,9 +46,13 @@ void fixedRankTest() {
 
 void sharingTest() {
   std::cout << "Sharing Test: " << std::endl;
-  Tensor<int> t1(2, 2);
+  Tensor t1 = Tensor<int>::buildTensor(2, 2);
   std::fill(t1.begin(), t1.end(), 9);
-  Tensor<int> t2 = t1.clone();
+  std::cout << "Tensor<int> t2 = t1.clone()" << std::endl;
+
+  Tensor t2 = t1.clone();
+  std::cout << "t2 = t1" << std::endl;
+  t2 = t1;
 
   t2[{0, 1}] = 12;
   printTensor(t1);
@@ -59,16 +63,22 @@ void sharingTest() {
   Tensor t3 = t1;
   t3[{0, 1}] = 12;
   printTensor(t1);
-  // assertTensorValues(t1, "9, 9, 9, 9, \n");
+  assertTensorValues(t1, "9, 9, 9, 9, \n");
   printTensor(t3);
   assertTensorValues(t3, "9, 9, 12, 9, \n");
+
+  Tensor t4 = t3.share();
+  *t4.begin() = 100;
+  assertTensorValues(t3, "100, 9, 12, 9, \n");
+  assertTensorValues(t4, "100, 9, 12, 9, \n");
+  assertTensorValues(t1, "9, 9, 9, 9, \n");
 
   std::cout << std::endl;
 }
 
 void sliceTest() {
   std::cout << "Slicing Test: " << std::endl;
-  Tensor<int> t1(2, 2);
+  Tensor t1 = Tensor<int>::buildTensor(2, 2);
   std::fill(t1.begin(), t1.end(), 0);
   int k = 0;
   for (auto& i : t1) {
@@ -83,27 +93,27 @@ void sliceTest() {
   assertTensorValues(t1, "0, 1, 2, 3, \n");
 
   std::cout << "Slice (1,1): ";
-  Tensor<int> t2 = t1.slice(1, 1);
+  Tensor t2 = t1.slice(1, 1);
   assertTensorValues(t2, "2, 3, \n");
   printTensor(t2);
 
   std::cout << "Slice (1,0): ";
-  Tensor<int> t3 = t1.slice(1, 0);
+  Tensor t3 = t1.slice(1, 0);
   assertTensorValues(t3, "0, 1, \n");
   printTensor(t3);
 
   std::cout << "Slice (0,0): ";
-  Tensor<int> t4 = t1.slice(0, 0);
+  Tensor t4 = t1.slice(0, 0);
   assertTensorValues(t4, "0, 2, \n");
   printTensor(t4);
 
   std::cout << "Slice (0,1): ";
-  Tensor<int> t5 = t1.slice(0, 1);
+  Tensor t5 = t1.slice(0, 1);
   assertTensorValues(t5, "1, 3, \n");
   printTensor(t5);
   std::cout << std::endl << "Higher Rank" << std::endl;
 
-  Tensor<int> th1(2, 2, 2);
+  Tensor th1 = Tensor<int>::buildTensor(2, 2, 2);
   std::fill(th1.begin(), th1.end(), 0);
   int k1 = 0;
   for (auto& j : th1) {
@@ -112,7 +122,7 @@ void sliceTest() {
   }
 
   std::cout << "Slice (0,0): ";
-  Tensor<int> th2 = th1.slice(0, 0);
+  Tensor th2 = th1.slice(0, 0);
   assertTensorValues(th2, "0, 2, 4, 6, \n");
   printTensor(th2);
 
@@ -126,13 +136,11 @@ void sliceTest() {
     it++;
   }
   std::cout << std::endl;
-
-  // TODO: test with double sliced tensor
 }
 
 void flattenTest() {
   std::cout << "Flatten Test: " << std::endl;
-  Tensor<int> t1(2, 2, 2);
+  Tensor<int> t1 = Tensor<int>::buildTensor(2, 2, 2);
   std::fill(t1.begin(), t1.end(), 0);
   int k = 0;
   for (auto& i : t1) {
@@ -156,7 +164,7 @@ void flattenTest() {
   // }
   std::cout << std::endl;
 
-  Tensor<int> t3(2, 2, 2, 2);
+  Tensor<int> t3 = Tensor<int>::buildTensor(2, 2, 2, 2);
   std::fill(t3.begin(), t3.end(), 0);
   int k2 = 0;
   for (auto& j : t3) {
@@ -189,9 +197,26 @@ void flattenTest() {
   std::cout << std::endl;
 }
 
+void creationTest() {
+  std::cout << "Dynamic" << std::endl;
+  Tensor<int> t0({2, 4, 6});
+  std::cout << "Copy Dynamic" << std::endl;
+  Tensor<int> t1(t0);
+  std::cout << "Move Dynamic" << std::endl;
+  Tensor<int> t2 = std::move(t0);
+
+  Tensor<int> t3({2, 4, 6});
+  std::cout << "Copy Dynamic-Dynamic" << std::endl;
+  t3 = t0;
+  std::cout << "Build fixed, move fixed" << std::endl;
+  Tensor t4 = Tensor<int>::buildTensor(2, 4, 6);
+
+  std::cout << "Fixed Initializer" << std::endl;
+  Tensor t5 = Tensor<int, 3>({2, 4, 6});
+}
+
 int main() {
-  auto dims = std::array{2, 2};
-  Tensor<int> t0(dims);
+  creationTest();
 
   Tensor<int> tensor({2, 4, 2});
 
