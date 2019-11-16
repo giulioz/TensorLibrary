@@ -154,28 +154,41 @@ void flattenTest() {
 
   std::cout << "Flatten (0,1): " << std::endl;
   Tensor<int> t2 = t1.flatten(0, 1);
+  printTensor(t2);
   std::cout << std::endl;
+
+  {
+    std::cout << "Constrained Test: " << std::endl;
+    auto it = t2.constrained_cbegin({VARIABLE_INDEX, 1});
+    auto end = t2.constrained_cend({VARIABLE_INDEX, 1});
+    while (it < end) {
+      std::cout << *it << " ";
+      it++;
+    }
+  }
 
   Tensor<int> t3 = Tensor<int>::buildTensor(2, 2, 2, 2);
   std::fill(t3.begin(), t3.end(), 0);
-  int k2 = 0;
+  k = 0;
   for (auto& j : t3) {
-    j = k2;
-    k2++;
+    j = k;
+    k++;
   }
   printTensor(t3);
 
   std::cout << "Flatten (1,2): " << std::endl;
   Tensor<int> t4 = t3.flatten(1, 2);
-  std::cout << std::endl;
   printTensor(t4);
+  std::cout << std::endl;
 
-  std::cout << "Constrained Test: " << std::endl;
-  auto it = t4.constrained_cbegin({0, VARIABLE_INDEX, 1});
-  auto end = t4.constrained_cend({0, VARIABLE_INDEX, 1});
-  while (it < end) {
-    std::cout << *it << " ";
-    it++;
+  {
+    std::cout << "Constrained Test: " << std::endl;
+    auto it = t4.constrained_cbegin({0, VARIABLE_INDEX, 1});
+    auto end = t4.constrained_cend({0, VARIABLE_INDEX, 1});
+    while (it < end) {
+      std::cout << *it << " ";
+      it++;
+    }
   }
 
   std::cout << std::endl;
@@ -215,71 +228,71 @@ void creationTest() {
 }
 
 int main() {
-  creationTest();
+  // creationTest();
 
-  Tensor<int> tensor({2, 4, 2});
+  // Tensor<int> tensor({2, 4, 2});
 
-  tensor[{0, 0, 0}] = 111;
-  tensor[{1, 0, 0}] = 211;
-  tensor[{0, 1, 0}] = 121;
-  tensor[{1, 1, 0}] = 221;
-  tensor[{0, 2, 0}] = 131;
-  tensor[{1, 2, 0}] = 231;
-  tensor[{0, 3, 0}] = 141;
-  tensor[{1, 3, 0}] = 241;
-  tensor[{0, 0, 1}] = 112;
-  tensor[{1, 0, 1}] = 212;
-  tensor[{0, 1, 1}] = 122;
-  tensor[{1, 1, 1}] = 222;
-  tensor[{0, 2, 1}] = 132;
-  tensor[{1, 2, 1}] = 232;
-  tensor[{0, 3, 1}] = 142;
-  tensor[{1, 3, 1}] = 242;
+  // tensor[{0, 0, 0}] = 111;
+  // tensor[{1, 0, 0}] = 211;
+  // tensor[{0, 1, 0}] = 121;
+  // tensor[{1, 1, 0}] = 221;
+  // tensor[{0, 2, 0}] = 131;
+  // tensor[{1, 2, 0}] = 231;
+  // tensor[{0, 3, 0}] = 141;
+  // tensor[{1, 3, 0}] = 241;
+  // tensor[{0, 0, 1}] = 112;
+  // tensor[{1, 0, 1}] = 212;
+  // tensor[{0, 1, 1}] = 122;
+  // tensor[{1, 1, 1}] = 222;
+  // tensor[{0, 2, 1}] = 132;
+  // tensor[{1, 2, 1}] = 232;
+  // tensor[{0, 3, 1}] = 142;
+  // tensor[{1, 3, 1}] = 242;
 
-  Tensor<int> tensorCopy = tensor;
+  // Tensor<int> tensorCopy = tensor;
 
-  std::cout << "Iterator read test: " << std::endl;
-  auto iterator = tensor.begin();
-  while (iterator < tensor.end()) {
-    std::cout << *iterator << ", ";
-    iterator++;
-  }
-  std::cout << std::endl;
+  // std::cout << "Iterator read test: " << std::endl;
+  // auto iterator = tensor.begin();
+  // while (iterator < tensor.end()) {
+  //   std::cout << *iterator << ", ";
+  //   iterator++;
+  // }
+  // std::cout << std::endl;
 
-  std::cout << "Write test: ";
-  tensor[0] = 42;
-  tensor[{1, 0, 0}] = 43;
-  tensor.begin()[2] = 44;
-  printTensor(tensor);
-  std::cout << std::endl;
+  // std::cout << "Write test: ";
+  // tensor[0] = 42;
+  // tensor[{1, 0, 0}] = 43;
+  // tensor.begin()[2] = 44;
+  // printTensor(tensor);
+  // std::cout << std::endl;
 
-  std::cout << "Copy test: " << std::endl;
-  Tensor<int> tensor2 = tensor;
-  tensor.begin()[0] = 42;
-  tensor.begin()[0] = 43;
-  std::fill(tensor.begin(), tensor.end(), 42);
-  std::cout << "Tensor1: ";
-  printTensor(tensor);
-  std::cout << "Tensor2: ";
-  printTensor(tensor2);
-  std::cout << std::endl;
+  // std::cout << "Copy test: " << std::endl;
+  // Tensor<int> tensor2 = tensor;
+  // tensor.begin()[0] = 42;
+  // tensor.begin()[0] = 43;
+  // std::fill(tensor.begin(), tensor.end(), 42);
+  // std::cout << "Tensor1: ";
+  // printTensor(tensor);
+  // std::cout << "Tensor2: ";
+  // printTensor(tensor2);
+  // std::cout << std::endl;
 
-  std::cout << "Constrained Test: " << std::endl;
-  auto it = tensorCopy.constrained_cbegin({VARIABLE_INDEX, 2, 0});
-  auto end = tensorCopy.constrained_cend({VARIABLE_INDEX, 2, 0});
-  while (it < end) {
-    std::cout << *it << std::endl;
-    it++;
-  }
-  std::cout << std::endl;
+  // std::cout << "Constrained Test: " << std::endl;
+  // auto it = tensorCopy.constrained_cbegin({VARIABLE_INDEX, 2, 0});
+  // auto end = tensorCopy.constrained_cend({VARIABLE_INDEX, 2, 0});
+  // while (it < end) {
+  //   std::cout << *it << std::endl;
+  //   it++;
+  // }
+  // std::cout << std::endl;
 
-  tensorCopy.constrained_begin({VARIABLE_INDEX, 0, 0})[1] = 1000;
-  printTensor(tensorCopy);
-  std::cout << std::endl;
+  // tensorCopy.constrained_begin({VARIABLE_INDEX, 0, 0})[1] = 1000;
+  // printTensor(tensorCopy);
+  // std::cout << std::endl;
 
-  fixedRankTest();
-  sharingTest();
-  sliceTest();
+  // fixedRankTest();
+  // sharingTest();
+  // sliceTest();
   flattenTest();
 
   return 0;

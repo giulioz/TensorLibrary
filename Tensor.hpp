@@ -285,9 +285,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         strides(0),
         sizes(0),
         _totalItems(0),
-        offset(0) {
-    std::cout << "CALLED: EMPTY CTOR" << std::endl;
-  }
+        offset(0) {}
 
  public:
   // Builder static method with varidic sizes
@@ -303,7 +301,6 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
     InternalUtils::calcStrides(tensor.sizes, tensor.strides);
     tensor._totalItems = (*(tensor.data)).size();
-    std::cout << "CALLED: DYNAMIC SIZES CTOR" << std::endl;
 
     return tensor;
   }
@@ -318,7 +315,6 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = (*data).size();
-    std::cout << "CALLED: SIZES CTOR" << std::endl;
   }
 
   // Copy Constructor
@@ -329,9 +325,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         strides(copy.strides.cbegin(), copy.strides.cend()),
         sizes(copy.sizes.cbegin(), copy.sizes.cend()),
         _totalItems(copy._totalItems),
-        offset(copy.offset) {
-    std::cout << "CALLED: COPY CTOR SIZED" << std::endl;
-  }
+        offset(copy.offset) {}
 
   // Copy Constructor
   Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
@@ -340,9 +334,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
-        offset(copy.offset) {
-    std::cout << "CALLED: COPY CTOR DYN" << std::endl;
-  }
+        offset(copy.offset) {}
 
   // Move Constructor
   template <int Rank>
@@ -351,9 +343,7 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         strides(move.strides.cbegin(), move.strides.cend()),
         sizes(move.sizes.cbegin(), move.sizes.cend()),
         _totalItems(move._totalItems),
-        offset(move.offset) {
-    std::cout << "CALLED: MOVE CTOR SIZED" << std::endl;
-  }
+        offset(move.offset) {}
 
   // Move Constructor
   Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
@@ -361,13 +351,10 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
         strides(move.strides.cbegin(), move.strides.cend()),
         sizes(move.sizes.cbegin(), move.sizes.cend()),
         _totalItems(move._totalItems),
-        offset(move.offset) {
-    std::cout << "CALLED: MOVE CTOR DYN" << std::endl;
-  }
+        offset(move.offset) {}
 
   Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
       const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy) {
-    std::cout << "CALLED: COPY EQUAL DYN" << std::endl;
     data = std::make_shared<std::vector<ValueType>>(
         std::vector<ValueType>(*copy.data));
     strides = copy.strides;
@@ -379,7 +366,6 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
 
   Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
       Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move) {
-    std::cout << "CALLED: MOVE EQUAL DYN" << std::endl;
     data = std::move(move.data);
     strides = std::move(move.strides);
     sizes = std::move(move.sizes);
@@ -508,8 +494,6 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
 
   // Clones the tensor without sharing data
   Tensor<ValueType, DYNAMIC_TENSOR_TAG> clone() const {
-    std::cout << "CALLED: CLONE" << std::endl;
-
     Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
     building.data = std::make_shared<std::vector<ValueType>>(*data);
     building.strides = strides;
@@ -521,8 +505,6 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
 
   // Clones the tensor sharing data
   Tensor<ValueType, DYNAMIC_TENSOR_TAG> share() const {
-    std::cout << "CALLED: SHARE" << std::endl;
-
     Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
     building.data = data;
     building.strides = strides;
@@ -567,8 +549,8 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
     flatted._totalItems = _totalItems;
 
     flatted.strides.insert(flatted.strides.end(), strides.begin(),
-                           strides.begin() + start);
-    flatted.strides.insert(flatted.strides.end(), strides.begin() + end,
+                           strides.begin() + start + 1);
+    flatted.strides.insert(flatted.strides.end(), strides.begin() + end + 1,
                            strides.end());
     flatted.sizes.insert(flatted.sizes.end(), sizes.begin(),
                          sizes.begin() + start);
@@ -577,6 +559,18 @@ class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
     for (size_t i = start; i != end; ++i) {
       flatted.sizes.at(start) *= sizes[i];
     }
+
+    std::cout << "STRIDES: ";
+    for (auto&& i : flatted.strides) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "SIZES: ";
+    for (auto&& i : flatted.sizes) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
 
     return flatted;
   }
@@ -613,9 +607,7 @@ class Tensor {
   Tensor()
       : data(std::make_shared<std::vector<ValueType>>()),
         _totalItems(0),
-        offset(0) {
-    std::cout << "CALLED: EMPTY CTOR" << std::endl;
-  }
+        offset(0) {}
 
  public:
   // Builder static method with varidic sizes
@@ -633,7 +625,6 @@ class Tensor {
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
     InternalUtils::calcStrides(tensor.sizes, tensor.strides);
     tensor._totalItems = (*(tensor.data)).size();
-    std::cout << "CALLED: DYNAMIC SIZES CTOR" << std::endl;
 
     return tensor;
   }
@@ -650,7 +641,6 @@ class Tensor {
         std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
     InternalUtils::calcStrides(this->sizes, strides);
     _totalItems = (*data).size();
-    std::cout << "CALLED: SIZES CTOR DYN" << std::endl;
   }
 
   // Copy Constructor
@@ -662,7 +652,6 @@ class Tensor {
         _totalItems(copy._totalItems),
         offset(copy.offset) {
     assert(copy.rank() == Rank);
-    std::cout << "CALLED: COPY CTOR" << std::endl;
   }
 
   // Copy Constructor
@@ -672,9 +661,7 @@ class Tensor {
         strides(copy.strides),
         sizes(copy.sizes),
         _totalItems(copy._totalItems),
-        offset(copy.offset) {
-    std::cout << "CALLED: COPY CTOR" << std::endl;
-  }
+        offset(copy.offset) {}
 
   // Move Constructor
   Tensor(Tensor<ValueType, Rank>&& move)
@@ -682,9 +669,7 @@ class Tensor {
         strides(move.strides),
         sizes(move.sizes),
         _totalItems(move._totalItems),
-        offset(move.offset) {
-    std::cout << "CALLED: MOVE CTOR" << std::endl;
-  }
+        offset(move.offset) {}
 
   // Move Constructor
   Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
@@ -694,7 +679,6 @@ class Tensor {
         _totalItems(move._totalItems),
         offset(move.offset) {
     assert(move.rank() == Rank);
-    std::cout << "CALLED: MOVE CTOR" << std::endl;
   }
 
   Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
@@ -704,7 +688,7 @@ class Tensor {
     sizes = copy.sizes;
     offset = copy.offset;
     _totalItems = copy._totalItems;
-    std::cout << "CALLED: COPY EQUAL" << std::endl;
+
     return *this;
   }
 
@@ -714,7 +698,7 @@ class Tensor {
     sizes = move.sizes;
     offset = move.offset;
     _totalItems = move._totalItems;
-    std::cout << "CALLED: MOVE EQUAL" << std::endl;
+
     return *this;
   }
 
@@ -740,13 +724,11 @@ class Tensor {
   }
 
   ConstrainedIterator constrained_begin(DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     return ConstrainedIterator(
         *this, InternalUtils::calcFixedStartIndex(strides, coords),
         strides[InternalUtils::findFixedIndex(coords)]);
   }
   ConstrainedIterator constrained_end(DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     const auto variableIndex = InternalUtils::findFixedIndex(coords);
     return ConstrainedIterator(*this,
                                InternalUtils::calcFixedStartIndex(
@@ -756,14 +738,12 @@ class Tensor {
 
   ConstrainedIterator constrained_begin(DimensionsType& coords,
                                         size_t variableIndex) {
-    static_assert(coords.size() == Rank);
     return ConstrainedIterator(
         *this, InternalUtils::calcFixedStartIndex(strides, coords),
         strides[variableIndex]);
   }
   ConstrainedIterator constrained_end(DimensionsType& coords,
                                       size_t variableIndex) {
-    static_assert(coords.size() == Rank);
     return ConstrainedIterator(*this,
                                InternalUtils::calcFixedStartIndex(
                                    strides, coords, sizes[variableIndex]),
@@ -771,13 +751,11 @@ class Tensor {
   }
 
   ConstrainedConstIterator constrained_cbegin(DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     return ConstrainedConstIterator(
         *this, InternalUtils::calcFixedStartIndex(strides, coords),
         strides[InternalUtils::findFixedIndex(coords)]);
   }
   ConstrainedConstIterator constrained_cend(DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     const auto variableIndex = InternalUtils::findFixedIndex(coords);
     return ConstrainedConstIterator(*this,
                                     InternalUtils::calcFixedStartIndex(
@@ -787,14 +765,12 @@ class Tensor {
 
   ConstrainedConstIterator constrained_cbegin(DimensionsType& coords,
                                               size_t variableIndex) {
-    static_assert(coords.size() == Rank);
     return ConstrainedConstIterator(
         *this, InternalUtils::calcFixedStartIndex(strides, coords),
         strides[variableIndex]);
   }
   ConstrainedConstIterator constrained_cend(DimensionsType& coords,
                                             size_t variableIndex) {
-    static_assert(coords.size() == Rank);
     return ConstrainedConstIterator(*this,
                                     InternalUtils::calcFixedStartIndex(
                                         strides, coords, sizes[variableIndex]),
@@ -809,7 +785,6 @@ class Tensor {
     return (*data)[linearCoord + offset];
   }
   ValueType& operator[](DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data)[index];
   }
@@ -818,7 +793,6 @@ class Tensor {
     return (*data).at(linearCoord + offset);
   }
   ValueType& at(DimensionsType& coords) {
-    static_assert(coords.size() == Rank);
     auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data).at(index);
   }
@@ -827,7 +801,6 @@ class Tensor {
     return (*data).at(linearCoord + offset);
   }
   const ValueType& c_at(DimensionsType& coords) const {
-    static_assert(coords.size() == Rank);
     auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
     return (*data).at(index);
   }
@@ -838,8 +811,6 @@ class Tensor {
 
   // Clones the tensor without sharing data
   Tensor<ValueType, Rank> clone() const {
-    std::cout << "CALLED: CLONE" << std::endl;
-
     Tensor<ValueType, Rank> building;
     building.data = std::make_shared<std::vector<ValueType>>(*data);
     building.strides = strides;
@@ -851,8 +822,6 @@ class Tensor {
 
   // Clones the tensor sharing data
   Tensor<ValueType, Rank> share() const {
-    std::cout << "CALLED: SHARE" << std::endl;
-
     Tensor<ValueType, Rank> building;
     building.data = data;
     building.strides = strides;
@@ -898,8 +867,8 @@ class Tensor {
     flatted._totalItems = _totalItems;
 
     flatted.strides.insert(flatted.strides.end(), strides.begin(),
-                           strides.begin() + start);
-    flatted.strides.insert(flatted.strides.end(), strides.begin() + end,
+                           strides.begin() + start + 1);
+    flatted.strides.insert(flatted.strides.end(), strides.begin() + end + 1,
                            strides.end());
     flatted.sizes.insert(flatted.sizes.end(), sizes.begin(),
                          sizes.begin() + start);
@@ -908,6 +877,18 @@ class Tensor {
     for (size_t i = start; i != end; ++i) {
       flatted.sizes.at(start) *= sizes[i];
     }
+
+    std::cout << "STRIDES: ";
+    for (auto&& i : flatted.strides) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "SIZES: ";
+    for (auto&& i : flatted.sizes) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
 
     return flatted;
   }
