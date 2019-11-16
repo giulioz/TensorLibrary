@@ -6,13 +6,13 @@ This template library allows to use a special "Tensor" data structure, useful fo
 
 ## Creation, Copy and Access
 
-The Tensor object constructor accepts the inner value type as template, and the sizes of the dimensions as a varidic. Otherwise, you can set the dimensions with an array-like iterable:
+The Tensor object constructor accepts the dimensions with an initializer list. Alternatively you can use a static builder method to build a fixed rank (compile time) tensor passing the sizes of the dimensions as a varidic.
 
 ```cpp
-TensorLib::Tensor<int> t1(2, 2);
+TensorLib::Tensor<int> t0({2, 2});
 
-auto dims = std::array{2, 2};
-TensorLib::Tensor<int> t2(dims);
+// Builds a fixed rank tensor
+TensorLib::Tensor t1 = TensorLib::Tensor<int>::buildTensor(2, 4, 6);
 ```
 
 The tensor can be accessed with the square brackets operator, passing an initializer list (with full dimensions indices) or a single number (linear index).
@@ -42,7 +42,7 @@ While rank can be checked in compile-time (using the `Tensor<type,rank>` syntax)
 A Tensor automatically manages memory, behaving like a std::vector, deallocating data on the end of the stack object lifetime. Copy, assignment and `clone()` method produces clones of the Tensor, which does not share data. If you want to have data shared, you can use the `share()` method, which create a copy of the tensor that shares the data;
 
 ```cpp
-TensorLib::Tensor<int> t1(1);
+TensorLib::Tensor<int> t1({1});
 std::fill(t1.begin(), t1.end(), 0);
 
 auto t2 = t1;
@@ -57,7 +57,7 @@ assert(t3[0] == 100); // true
 You can access tensor sizes using these methods:
 
 ```cpp
-TensorLib::Tensor<int> tensor(10,5);
+TensorLib::Tensor tensor = TensorLib::Tensor<int>::buildTensor(10, 5);
 tensor.rank(); // returns the rank
 tensor.size(); // returns the total count (10*5)
 tensor.sizeAt(0); // returns the size at a given index (10)
@@ -68,7 +68,7 @@ tensor.sizeAt(0); // returns the size at a given index (10)
 You can operate on a Tensor using a linear Iterator:
 
 ```cpp
-TensorLib::Tensor<int> t1(2, 2, 2);
+TensorLib::Tensor<int> t1 = TensorLib::Tensor<int>::buildTensor(2, 2, 2);
 std::fill(t1.begin(), t1.end(), 0);
 for (auto& i : t1) {
   i = 10;
@@ -79,7 +79,7 @@ for (auto& i : t1) {
 You may also iterate on a single dimension, specifying the base coordinates and the variable index (using the `VARIABLE_INDEX` macro):
 
 ```cpp
-TensorLib::Tensor<int> tensor(2, 2, 2);
+TensorLib::Tensor<int> tensor({2, 2, 2});
 auto it = tensor.constrained_cbegin({VARIABLE_INDEX, 2, 0});
 auto end = tensor.constrained_cend({VARIABLE_INDEX, 2, 0});
 while (it < end) {
@@ -98,7 +98,7 @@ Every iterator has a constant version, with the prefix `c`.
 You can also slice a tensor using the method `slice(dimension, value)`, which returns a new tensor (that shares data with the previous):
 
 ```cpp
-Tensor<int> t1(2, 2);
+Tensor<int> t1({2, 2});
 int k = 0;
 for (auto& i : t1) {
   i = k;
@@ -125,7 +125,7 @@ Strides are kept in left-most manner.
 You can flatten a tensor using the method `flatten(start, end)`, which take 2 parameters: `start` and `end`, that represent the indexes of the dimensions that bounds the region that you want to flatten (you can only flatten consecutive dimensions), for example:
 
 ```cpp
-Tensor<int> t1(2, 2, 2);
+Tensor<int> t1({2, 2, 2});
 
 Tensor<int> t2 = t1.flatten(1, 2);
 // Will flatten to a tensor with dimensions: (2, 4)
