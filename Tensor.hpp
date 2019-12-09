@@ -1,899 +1,708 @@
-#ifndef TENSOR_H
-#define TENSOR_H
+#ifndef TENSOR
+#define TENSOR
 
-#include <assert.h>
-#include <array>
-#include <functional>
-#include <initializer_list>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <tuple>
-#include <vector>
+#include<cstdlib>
+#include<cassert>
+#include<utility>
+#include<memory>
+#include<type_traits>
+#include<initializer_list>
+#include<vector>
+#include<algorithm>
+#include<array>
 
-#include <iostream>
 
-namespace TensorLib {
+using namespace std::rel_ops;
 
-// Placeholder for Constrained Iterator and Dynamic Tensor
-inline constexpr size_t VARIABLE_INDEX = -1;
-inline constexpr int DYNAMIC_TENSOR_TAG = -1;
+namespace tensor {
+    
 
-// Forward Declarations
-// Rank DYNAMIC_TENSOR_TAG = Dynamic
-template <typename ValueType, int Rank = DYNAMIC_TENSOR_TAG>
-class Tensor;
 
-namespace InternalUtils {
-
-// Utility functions
-template <typename StridesType, typename CoordsType>
-size_t coordsToIndex(const CoordsType& coords, const StridesType& strides) {
-  size_t index = 0;
-  size_t strideIndex = 0;
-  for (auto&& coord : coords) {
-    index += coord * (strides.at(strideIndex));
-    strideIndex++;
-  }
-
-  return index;
-}
-
-inline constexpr size_t calcDataSize() { return 1; }
-
-template <typename... Args>
-size_t calcDataSize(const size_t first, const Args... args) {
-  return first * calcDataSize(args...);
-}
-
-template <typename CoordsType>
-size_t calcDataSize(const CoordsType& dimensions) {
-  return std::accumulate(std::begin(dimensions), std::end(dimensions), 1,
-                         std::multiplies<double>());
-}
-
-template <typename CoordsType>
-void calcStrides(const CoordsType& dimensions, std::vector<size_t>& strides) {
-  size_t stride = 1;
-  int i = 0;
-  for (auto&& dim : dimensions) {
-    strides.push_back(stride);
-    stride *= dim;
-    ++i;
-  }
-}
-
-template <size_t Rank, typename CoordsType>
-void calcStrides(const CoordsType& dimensions,
-                 std::array<size_t, Rank>& strides) {
-  size_t stride = 1;
-  int i = 0;
-  for (auto&& dim : dimensions) {
-    strides[i] = stride;
-    stride *= dim;
-    ++i;
-  }
-}
-
-template <typename StridesType, typename CoordsType>
-size_t calcFixedStartIndex(const StridesType& strides,
-                           const CoordsType& indexList,
-                           const size_t& width = 0) {
-  size_t index = 0;
-  size_t position = 0;
-  for (auto&& fixedValue : indexList) {
-    if (fixedValue != VARIABLE_INDEX) {
-      position += fixedValue * strides[index];
-    } else if (width != 0) {
-      position += width * strides[index];
-    }
-    index++;
-  }
-
-  return position;
-}
-
-template <typename CoordsType>
-size_t findFixedIndex(const CoordsType& indexList) {
-  size_t index = 0;
-  for (auto&& fixedValue : indexList) {
-    if (fixedValue == VARIABLE_INDEX) {
-      return index;
-    }
-    index++;
-  }
-
-  return index;
-}
-
-// Standard iterator types
-template <typename ITValueType, int Rank>
-struct IteratorTypeStandard {
-  using ValueType = ITValueType;
-  using ReturnType = ITValueType;
-  using InternalTensorRef = Tensor<ValueType, Rank>&;
-
-  static inline ValueType& getElementRef(InternalTensorRef& tensor,
-                                         size_t pos) {
-    return tensor.at(pos);
-  }
+// policy for dynamically ranked tensors    
+struct dynamic {
+    typedef std::vector<size_t> index_type;
+    typedef std::vector<size_t> width_type;
 };
 
-// Constant iterator types
-template <typename ITValueType, int Rank>
-struct IteratorTypeConst {
-  using ValueType = ITValueType;
-  using ReturnType = const ITValueType;
-  using InternalTensorRef = const Tensor<ValueType, Rank>&;
-
-  static inline const ValueType& getElementRef(InternalTensorRef& tensor,
-                                               size_t pos) {
-    return tensor.c_at(pos);
-  }
+// policy for fixed-rank tensors
+template<size_t R> struct rank {
+    typedef std::array<size_t,R> index_type;
+    typedef std::array<size_t,R> width_type;
 };
 
-}  // namespace InternalUtils
 
-//
-// Custom Iterator for Tensor
-//
-template <typename ITType>
-class Iterator {
-  template <typename, int>
-  friend class Tensor;
 
- public:
-  // Iterator Traits
-  using difference_type = size_t;
-  using value_type = typename ITType::ValueType;
-  using pointer = typename ITType::ValueType*;
-  using reference = typename ITType::ValueType&;
-  using iterator_category = std::random_access_iterator_tag;
 
- private:
-  // Instance Fields
-  typename ITType::InternalTensorRef tensor;
-  difference_type currentPos;
-  difference_type fixedStride;
+// tensor type
+template<typename T, class type=dynamic>
+class tensor;
 
-  Iterator(typename ITType::InternalTensorRef tensor,
-           difference_type startPos = 0, difference_type fixedStride = 1)
-      : tensor(tensor), currentPos(startPos), fixedStride(fixedStride) {}
+    namespace reserved {
+		// generic iterator used by all tensor classes (except rank 1 specializations)
+        template<typename T, class type>
+        class iterator {
+        public:
+            T& operator *() const { return *ptr; }
+            
+            iterator& operator ++() {
+				// I am using a right-major layout
+				//start increasing the last index
+                size_t index=stride.size()-1;
+                ++idx[index];
+                ptr += stride[index];
+                // as long as the current index has reached maximum width,
+                // set it to 0 and increase the next index
+                while(idx[index]==width[index] && index>0) {
+                    idx[index]=0;
+                    ptr -= width[index]*stride[index];
+                    --index;
+                    ++idx[index];
+                    ptr += stride[index];
+                }
+                return *this;
+            }
+            
+            iterator operator ++(int) {
+                iterator result(*this);
+                operator ++();
+                return result;
+            }
+            iterator& operator --() {
+				// I am using a right-major layout
+				//start increasing the last index
+                size_t index=stride.size()-1;
+                // as long as the current index has reached 0,
+                // set it to width-1 and decrease the next index
+                while(idx[index]==0 && index>0) {
+                    idx[index]=width[index]-1;
+                    ptr + idx[index]*stride[index];
+                    --index;
+                }
+                --idx[index];
+                ptr -= stride[index];
+                return *this;
+            }
+            iterator operator --(int) {
+                iterator result(*this);
+                operator --();
+                return result;
+            }
+            
+            iterator& operator -= (int v) {
+                if (v<0) return operator +=(-v);
+                size_t index=stride.size()-1;
+                while (v>0 && index>=0) {
+                    size_t val = v%width[index];
+                    v /= width[index];
+                    if (val<=idx[index]) {
+                        idx[index]-=val;
+                        ptr -= val*stride[index];
+                    } else {
+                        --v;
+                        idx[index] += width[index]-val;
+                        ptr += (width[index]-val)*stride[index];
+                    }
+                    --index;
+                }
+                return *this;
+            }
+            
+            iterator& operator += (int v) {
+                if (v<0) return operator -=(-v);
+                size_t index=stride.size()-1;
+                while (v>0 && index>=0) {
+                    size_t val = v%width[index];
+                    v /= width[index];
+                    idx[index] += val;
+                    ptr += val*stride[index];
+                    if(idx[index] >= width[index] && index>0) {
+                        idx[index] -= width[index];
+                        ++idx[index-1] ;
+                        ptr += stride[index-1] - width[index]*stride[index];
+                    }
+                    --index;
+                }
+                return *this;
+            }
+            
+            iterator operator + (int v) const {
+                iterator result(*this);
+                result += v;
+                return result;
+            }
+            iterator operator - (int v) const {
+                iterator result(*this);
+                result -= v;
+                return result;
+            }
+            
+            T& operator[] (int v) const {
+                iterator iter(*this);
+                iter += v;
+                return *iter;
+            }
+                    
+            // defines equality as external friend function
+            // inequality gest automatically defined by std::rel_ops
+            friend bool operator ==(const iterator &i, const iterator &j) { return i.ptr==j.ptr; }   
+            
+            friend class tensor<T,type>;
+                
+            
+        private:
+            iterator(const typename type::width_type& w, const typename type::index_type& s, T* p): width(w), stride(s), idx(s), ptr(p) {
+                std::fill(idx.begin(),idx.end(),0);
+            }
+            
+            // maintain references to width and strides
+            // uses policy for acual types
+            const typename type::width_type& width;
+            const typename type::index_type& stride;
+            
+            // maintains both indices and pointer to data
+            // uses pointer to data for dereference and equality for efficiency
+            typename type::index_type idx;
+            T* ptr;
+        };
+        
+        
+        // iterator over single index
+        // does not need to know actual tensor type
+        template<typename T>
+        class index_iterator {
+        public:
+            T& operator *() const { return *ptr; }
+            
+            index_iterator& operator ++() {
+                ptr += stride;
+                return *this;
+            }
+            index_iterator operator ++(int) {
+                index_iterator result(*this);
+                operator ++();
+                return result;
+            }
+            index_iterator& operator --() {
+                ptr -= stride;
+                return *this;
+            }
+            index_iterator operator --(int) {
+                index_iterator result(*this);
+                operator --();
+                return result;
+            }
+            
+            index_iterator& operator -= (int v) {
+                ptr -= v*stride;
+                return *this;
+            }
+            index_iterator& operator += (int v) {
+                ptr +- v*stride;
+                return *this;
+            }
+            
+            index_iterator operator + (int v) const {
+                index_iterator result(*this);
+                result += v;
+                return result;
+            }
+            index_iterator operator - (int v) const {
+                index_iterator result(*this);
+                result -= v;
+                return result;
+            }
+            
+            T& operator[] (int v) const { return *(ptr + v*stride); }
+                    
+            
+            friend bool operator ==(const index_iterator &i, const index_iterator &j) { return i.ptr==j.ptr; }   
+            
+            template<typename, typename>
+            friend class ::tensor::tensor;
+            
+        private:
+            index_iterator(size_t s, T* p) : stride(s), ptr(p) {}
+            
+            size_t stride;
+            T* ptr;
+            
+        };
+    }
 
- public:
-  Iterator(const Iterator& copy)
-      : tensor(copy.tensor),
-        currentPos(copy.currentPos),
-        fixedStride(copy.fixedStride) {}
 
-  Iterator(const Iterator&& move)
-      : tensor(move.tensor),
-        currentPos(move.currentPos),
-        fixedStride(move.fixedStride) {}
+// tensor specialization for dynamic rank
+template<typename T>
+class tensor<T,dynamic> {
+public:
+	// C-style constructor with explicit rank and pointer to array of dimensions
+	// all other constructors are redirected to this one
+    tensor(size_t rank, const size_t dimensions[]) : width(dimensions, dimensions+rank), stride(rank,1UL) {
+		for (size_t i=width.size()-1UL; i!=0; --i) stride[i-1] = stride[i]*width[i];
+        data = std::make_shared<std::vector<T>>(stride[0]*width[0]);
+        start_ptr = &(data->operator[](0));
+	}
+	tensor(const std::vector<size_t>& dimensions) : tensor(dimensions.size(),&dimensions[0]) {}
+	tensor(std::initializer_list<size_t> dimensions) : tensor(dimensions.size(),&*dimensions.begin()) {}
+    
+	template<size_t rank> tensor(const size_t dims[rank]) : tensor(rank, dims) {}
+    template<typename...Dims> tensor(Dims...dims) : width({static_cast<const size_t>(dims)...}), stride(sizeof...(dims), 1UL) {
+		for (size_t i=width.size()-1UL; i!=0UL; --i) stride[i-1] = stride[i]*width[i];
+        data = std::make_shared<std::vector<T>>(stride[0]*width[0]);
+        start_ptr = &(data->operator[](0));
+	}		
+		
+    
+    tensor(const tensor<T,dynamic>&X)=default;
+    tensor(tensor<T,dynamic>&&X)=default;
+    tensor<T,dynamic>& operator = (const tensor<T,dynamic>&X)=default;
+    tensor<T,dynamic>& operator = (tensor<T,dynamic>&&X)=default;
+    
+    // all tensor types are friend
+    // this are used by alien copy constructors, i.e. copy constructors copying different tensor types.
+    template<typename, typename> friend class tensor;
+    
+    template<size_t R>
+    tensor(const tensor<T,rank<R>>&X) : data(X.data), width(X.width.begin(),X.width.end()), stride(X.stride.begin(),X.stride.end()), start_ptr(X.start_ptr) {}
+    
+    
+    
+	// rank accessor
+	size_t get_rank() const { return width.size(); }
+	
+	// direct accessors. Similarly to std::vector, operator () does not perform range check 
+	// while at() does
+	T& operator()(const size_t dimensions[]) const {
+		const size_t rank = width.size();
+		T* ptr=start_ptr;
+		for(int i=0; i!=rank; ++i) ptr += dimensions[i]*stride[i];
+		return *ptr;
+	}
+	T& at(const size_t dimensions[]) const {
+		const size_t rank = width.size();
+		T* ptr=start_ptr;
+		for(int i=0; i!=rank; ++i) {
+			assert(dimensions[i]<width[i]);
+			ptr += dimensions[i]*stride[i];
+			}
+		return *ptr;
+	}
+	
+	T& operator()(const std::vector<size_t>& dimensions) const { 
+        assert(dimensions.size()==get_rank());
+        return operator()(&dimensions[0]); 
+    }
+    T& at(const std::vector<size_t>& dimensions) const { 
+        assert(dimensions.size()==get_rank());
+        return at(&dimensions[0]); 
+    }
+	
+	template<size_t rank>
+	T& operator()(const size_t dimensions[rank]) const { 
+        assert(rank==get_rank());
+        return operator()(static_cast<const size_t*>(dimensions)); 
+    }
+	template<size_t rank>
+	T& at(const size_t dimensions[rank]) const { 
+        assert(rank==get_rank());
+        return at(static_cast<const size_t*>(dimensions)); 
+    }
+	
+	template<typename...Dims>
+	T& operator()(Dims...dimensions) const {
+        assert(sizeof...(dimensions)==get_rank());
+        return operator()({static_cast<const size_t>(dimensions)...});
+    }
+	template<typename...Dims>
+	T& at(Dims...dimensions) const { 
+        assert(sizeof...(dimensions)==get_rank());
+        return at({static_cast<const size_t>(dimensions)...});
+    }
 
-  auto& operator*() { return ITType::getElementRef(tensor, currentPos); }
+	
+	// slice operation create a new tensor type sharing the data and removing the sliced index
+	tensor<T,dynamic> slice(size_t index, size_t i) const {
+		const size_t rank=width.size();
+		assert(index<rank);
+        tensor<T,dynamic> result;
+        result.data=data;
+        result.width.insert(result.width.end(),width.begin(),width.begin()+index);
+        result.width.insert(result.width.end(),width.begin()+index+1,width.end());
+        result.stride.insert(result.stride.end(),stride.begin(),stride.begin()+index);
+        result.stride.insert(result.stride.end(),stride.begin()+index+1,stride.end());
+        result.start_ptr = start_ptr+i*stride[index];
 
-  auto* operator-> () { return &ITType::getElementRef(tensor, currentPos); }
+		return result;
+	}
+	// operator [] slices the first (leftmost) index
+	tensor<T,dynamic> operator[](size_t i) const { return slice(0,i); }
+	
+	// window operation on a single index
+	tensor<T,dynamic> window(size_t index, size_t begin, size_t end) const {
+		tensor<T,dynamic> result(*this);
+		result.width[index]=end-begin;
+		result.start_ptr += result.stride[index]*begin;
+		return result;
+	}
+	
+	//window operations on all indices
+	tensor<T,dynamic> window(const size_t begin[], const size_t end[]) const {
+		tensor<T,dynamic> result(*this);
+		const size_t r=get_rank();
+		for (int i=0; i!=r; ++i) {
+			result.width[i]=end[i]-begin[i];
+			result.start_ptr += result.stride[i]*begin[i];
+		}
+		return result;
+	}	
+	tensor<T,dynamic> window(const std::vector<size_t>& begin, const std::vector<size_t>& end) const
+	{ return window(&(begin[0]), &(end[0])); }
+	
+	// flaten operation
+	// do not use over windowed and sliced ranges
+	tensor<T,dynamic> flatten(size_t begin, size_t end) const {
+		tensor<T,dynamic> result;
+		result.stride.insert(result.stride.end(),stride.begin(),stride.begin()+begin);
+		result.stride.insert(result.stride.end(),stride.begin()+end,stride.end());
+		result.width.insert(result.width.end(),width.begin(),width.begin()+begin);
+		result.width.insert(result.width.end(),width.begin()+end,width.end());
+		for(int i=begin; i!=end; ++i) result.width[end]*=width[i];
+		result.start_prt=start_ptr;
+		result.data=data;
+		return result;
+	}	
+		
+	// specialized iterator type
+	typedef reserved::iterator<T,dynamic> iterator;
+    
+    iterator begin() const { return iterator(width,stride,start_ptr); }
+    iterator end() const { 
+        iterator result = begin();
+        result.idx[0] = width[0];
+        result.ptr += width[0]*stride[0];
+        return result;
+    }
+    
+    // specialized index_iterator type
+    typedef reserved::index_iterator<T> index_iterator;
+    
+    // begin and end methods producing index_iterator require the index to be iterated over 
+    // and all the values for the other indices
+    index_iterator begin(size_t index, const size_t dimensions[])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) - dimensions[index]*stride[index]); 
+    }
+    index_iterator end(size_t index, const size_t dimensions[])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) + (width[index]-dimensions[index])*stride[index]); 
+    }
+    
+    template<size_t rank>
+    index_iterator begin(size_t index, const size_t dimensions[rank])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) - dimensions[index]*stride[index]); 
+    }
+    template<size_t rank>
+    index_iterator end(size_t index, const size_t dimensions[rank])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) + (width[index]-dimensions[index])*stride[index]); 
+    }
+    
+    index_iterator begin(size_t index, const std::vector<size_t>& dimensions)  const { 
+        return index_iterator(stride[index], &operator()(dimensions) - dimensions[index]*stride[index]); 
+    }
+    index_iterator end(size_t index, const std::vector<size_t>& dimensions)  const { 
+        return index_iterator(stride[index], &operator()(dimensions) + (width[index]-dimensions[index])*stride[index]); 
+    }
 
-  auto& operator[](const difference_type& n) {
-    return ITType::getElementRef(tensor, n);
-  }
 
-  Iterator& operator++() {
-    currentPos += fixedStride;
-    return *this;
-  }
-  Iterator& operator--() {
-    currentPos -= fixedStride;
-    return *this;
-  }
-
-  Iterator operator++(int) {
-    Iterator result(*this);
-    operator++();
-    return result;
-  }
-  Iterator operator--(int) {
-    Iterator result(*this);
-    operator--();
-    return result;
-  }
-
-  Iterator operator+(const difference_type& n) const {
-    return Iterator(tensor, currentPos + (n * fixedStride), fixedStride);
-  }
-
-  Iterator& operator+=(const difference_type& n) {
-    currentPos += (n * fixedStride);
-    return *this;
-  }
-
-  Iterator operator-(const difference_type& n) const {
-    return Iterator(tensor, currentPos - (n * fixedStride), fixedStride);
-  }
-
-  Iterator& operator-=(const difference_type& n) {
-    currentPos -= (n * fixedStride);
-    return *this;
-  }
-
-  bool operator==(const Iterator& other) const {
-    return currentPos == other.currentPos;
-  }
-
-  bool operator!=(const Iterator& other) const {
-    return currentPos != other.currentPos;
-  }
-
-  bool operator<(const Iterator& other) const {
-    return currentPos < other.currentPos;
-  }
-
-  bool operator>(const Iterator& other) const {
-    return currentPos > other.currentPos;
-  }
-
-  bool operator<=(const Iterator& other) const {
-    return currentPos <= other.currentPos;
-  }
-
-  bool operator>=(const Iterator& other) const {
-    return currentPos >= other.currentPos;
-  }
-
-  difference_type operator+(const Iterator& other) const {
-    return (currentPos + other.currentPos) / fixedStride;
-  }
-
-  difference_type operator-(const Iterator& other) const {
-    return (currentPos - other.currentPos) / fixedStride;
-  }
+private:
+	tensor()=default;
+    
+    std::shared_ptr<std::vector<T>> data;
+    dynamic::width_type width;
+    dynamic::index_type stride;
+    T* start_ptr;
 };
 
-template <typename ValueType>
-class Tensor<ValueType, DYNAMIC_TENSOR_TAG> {
-  template <typename, int>
-  friend class Tensor;
 
- private:
-  using StandardIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<
-          ValueType, DYNAMIC_TENSOR_TAG>>;
-  using ConstIterator = Iterator<
-      typename InternalUtils::IteratorTypeConst<ValueType, DYNAMIC_TENSOR_TAG>>;
-  using ConstrainedIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<
-          ValueType, DYNAMIC_TENSOR_TAG>>;
-  using ConstrainedConstIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<
-          ValueType, DYNAMIC_TENSOR_TAG>>;
 
-  using StridesType = std::vector<size_t>;
-  using SizesType = std::vector<size_t>;
-  using DimensionsType = const std::vector<size_t>&;
 
-  // Internal Data
-  std::shared_ptr<std::vector<ValueType>> data;
-  StridesType strides;
-  SizesType sizes;
-  size_t _totalItems;
-  size_t offset;
 
-  // Empty Constructor
-  Tensor()
-      : data(std::make_shared<std::vector<ValueType>>()),
-        strides(0),
-        sizes(0),
-        _totalItems(0),
-        offset(0) {}
 
- public:
-  // Builder static method with varidic sizes
-  // Static method because of overload resolution
-  template <typename... Sizes>
-  static Tensor<ValueType, sizeof...(Sizes)> buildTensor(Sizes... sizes) {
-    Tensor<ValueType, sizeof...(Sizes)> tensor;
 
-    tensor.sizes =
-        std::array<size_t, sizeof...(Sizes)>{static_cast<size_t>(sizes)...};
-    tensor.offset = 0;
-    tensor.data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
-    InternalUtils::calcStrides(tensor.sizes, tensor.strides);
-    tensor._totalItems = (*(tensor.data)).size();
 
-    return tensor;
-  }
 
-  //
-  // Public Constructors
-  //
 
-  Tensor(const std::initializer_list<size_t>& sizes)
-      : sizes(sizes.begin(), sizes.end()), offset(0) {
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
-    InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = (*data).size();
-  }
 
-  // Copy Constructor
-  template <int Rank>
-  Tensor(const Tensor<ValueType, Rank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>(
-            std::vector<ValueType>(*copy.data))),
-        strides(copy.strides.cbegin(), copy.strides.cend()),
-        sizes(copy.sizes.cbegin(), copy.sizes.cend()),
-        _totalItems(copy._totalItems),
-        offset(copy.offset) {}
 
-  // Copy Constructor
-  Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
-      : data(std::make_shared<std::vector<ValueType>>(
-            std::vector<ValueType>(*copy.data))),
-        strides(copy.strides),
-        sizes(copy.sizes),
-        _totalItems(copy._totalItems),
-        offset(copy.offset) {}
 
-  // Move Constructor
-  template <int Rank>
-  Tensor(Tensor<ValueType, Rank>&& move)
-      : data(std::move(move.data)),
-        strides(move.strides.cbegin(), move.strides.cend()),
-        sizes(move.sizes.cbegin(), move.sizes.cend()),
-        _totalItems(move._totalItems),
-        offset(move.offset) {}
 
-  // Move Constructor
-  Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
-      : data(std::move(move.data)),
-        strides(move.strides.cbegin(), move.strides.cend()),
-        sizes(move.sizes.cbegin(), move.sizes.cend()),
-        _totalItems(move._totalItems),
-        offset(move.offset) {}
 
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
-      const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy) {
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(*copy.data));
-    strides = copy.strides;
-    sizes = copy.sizes;
-    offset = copy.offset;
-    _totalItems = copy._totalItems;
-    return *this;
-  }
 
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG>& operator=(
-      Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move) {
-    data = std::move(move.data);
-    strides = std::move(move.strides);
-    sizes = std::move(move.sizes);
-    offset = move.offset;
-    _totalItems = move._totalItems;
-    return *this;
-  }
+// tensor specialization for fixed-rank
+template<typename T, size_t R>
+class tensor<T, rank<R>> {
+public:
+	// C-style constructor with implicit rank and pointer to array of dimensions
+	// all other constructors are redirected to this one
+    tensor(const size_t dimensions[R])  {
+        size_t *wptr=&(width[0]), *endp=&(width[0])+R;
+        while (wptr!=endp) *(wptr++) = *(dimensions++);
+        stride[R-1]=1;
+        for (int i=R-1; i!=0; --i) {
+            stride[i-1] = stride[i]*width[i];
+        }
+        data = std::make_shared<std::vector<T>>(stride[0]*width[0]);
+        start_ptr = &(data->operator[](0));
+    }
+    
+    tensor(const std::vector<size_t>& dimensions) : tensor(&dimensions[0]) { assert(dimensions.size()==R); }
+    template<typename...Dims> tensor(Dims...dims) : width({static_cast<const size_t>(dims)...}) {
+		static_assert(sizeof...(dims)==R, "size mismatch");
+        
+        stride[R-1]=1UL;
+        for (size_t i=R-1UL; i!=0UL; --i) {
+            stride[i-1] = stride[i]*width[i];
+        }
+        data = std::make_shared<std::vector<T>>(stride[0]*width[0]);
+        start_ptr = &(data->operator[](0));
+    }
+    
+    tensor(const tensor<T,rank<R>>&X) = default;
+    tensor(tensor<T,rank<R>>&&X) = default;
+    
+    // all tensor types are friend
+    // this are used by alien copy constructors, i.e. copy constructors copying different tensor types.
+    template<typename, typename> friend class tensor;
+    
+    tensor(const tensor<T,dynamic>& X) : data(X.data), width(X.width.begin(),X.width.end()), stride(X.stride.begin(),X.stride.end()), start_ptr(X.start_ptr){
+		assert(X.get_rank()==R);
+	}
+	
 
-  //
-  // Info Getters
-  //
-
-  size_t rank() const { return sizes.size(); }
-  size_t size() const { return _totalItems; }
-  size_t sizeAt(size_t dimension) const { return sizes.at(dimension); }
-
-  //
-  // Iterators Initializers
-  //
-
-  StandardIterator begin() { return StandardIterator(*this, 0, strides[0]); }
-  StandardIterator end() {
-    return StandardIterator(*this, _totalItems * strides[0]);
-  }
-  ConstIterator cbegin() const { return ConstIterator(*this, 0, strides[0]); }
-  ConstIterator cend() const {
-    return ConstIterator(*this, _totalItems * strides[0]);
-  }
-
-  ConstrainedIterator constrained_begin(DimensionsType& coords) {
-    assert(coords.size() == rank());
-    return ConstrainedIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[InternalUtils::findFixedIndex(coords)]);
-  }
-  ConstrainedIterator constrained_end(DimensionsType& coords) {
-    assert(coords.size() == rank());
-    const auto variableIndex = InternalUtils::findFixedIndex(coords);
-    return ConstrainedIterator(*this,
-                               InternalUtils::calcFixedStartIndex(
-                                   strides, coords, sizes[variableIndex]),
-                               strides[variableIndex]);
-  }
-
-  ConstrainedIterator constrained_begin(DimensionsType& coords,
-                                        size_t variableIndex) {
-    assert(coords.size() == rank());
-    return ConstrainedIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[variableIndex]);
-  }
-  ConstrainedIterator constrained_end(DimensionsType& coords,
-                                      size_t variableIndex) {
-    assert(coords.size() == rank());
-    return ConstrainedIterator(*this,
-                               InternalUtils::calcFixedStartIndex(
-                                   strides, coords, sizes[variableIndex]),
-                               strides[variableIndex]);
-  }
-
-  ConstrainedConstIterator constrained_cbegin(DimensionsType& coords) {
-    assert(coords.size() == rank());
-    return ConstrainedConstIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[InternalUtils::findFixedIndex(coords)]);
-  }
-  ConstrainedConstIterator constrained_cend(DimensionsType& coords) {
-    assert(coords.size() == rank());
-    const auto variableIndex = InternalUtils::findFixedIndex(coords);
-    return ConstrainedConstIterator(*this,
-                                    InternalUtils::calcFixedStartIndex(
-                                        strides, coords, sizes[variableIndex]),
-                                    strides[variableIndex]);
-  }
-
-  ConstrainedConstIterator constrained_cbegin(DimensionsType& coords,
-                                              size_t variableIndex) {
-    assert(coords.size() == rank());
-    return ConstrainedConstIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[variableIndex]);
-  }
-  ConstrainedConstIterator constrained_cend(DimensionsType& coords,
-                                            size_t variableIndex) {
-    assert(coords.size() == rank());
-    return ConstrainedConstIterator(*this,
-                                    InternalUtils::calcFixedStartIndex(
-                                        strides, coords, sizes[variableIndex]),
-                                    strides[variableIndex]);
-  }
-
-  //
-  // Access Operators, both linear and with coordinates
-  //
-
-  ValueType& operator[](const size_t linearCoord) {
-    return (*data)[linearCoord + offset];
-  }
-  ValueType& operator[](DimensionsType& coords) {
-    assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data)[index];
-  }
-
-  ValueType& at(const size_t linearCoord) {
-    return (*data).at(linearCoord + offset);
-  }
-  ValueType& at(DimensionsType& coords) {
-    assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data).at(index);
-  }
-
-  const ValueType& c_at(const size_t linearCoord) const {
-    return (*data).at(linearCoord + offset);
-  }
-  const ValueType& c_at(DimensionsType& coords) const {
-    assert(coords.size() == rank());
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data).at(index);
-  }
-
-  //
-  // Manipulation functions
-  //
-
-  // Clones the tensor without sharing data
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG> clone() const {
-    Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
-    building.data = std::make_shared<std::vector<ValueType>>(*data);
-    building.strides = strides;
-    building.sizes = sizes;
-    building.offset = offset;
-    building._totalItems = _totalItems;
-    return building;
-  }
-
-  // Clones the tensor sharing data
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG> share() const {
-    Tensor<ValueType, DYNAMIC_TENSOR_TAG> building;
-    building.data = data;
-    building.strides = strides;
-    building.sizes = sizes;
-    building.offset = offset;
-    building._totalItems = _totalItems;
-    return building;
-  }
-
-  // Returns a slice of the tensor
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG> slice(
-      size_t dimensionIndex, size_t fixedDimensionValue) const {
-    assert(dimensionIndex < rank() &&
-           fixedDimensionValue <= sizes[dimensionIndex]);
-
-    Tensor<ValueType, DYNAMIC_TENSOR_TAG> sliced;
-    sliced.data = data;
-    sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
-
-    sliced.sizes.insert(sliced.sizes.end(), sizes.begin(),
-                        sizes.begin() + dimensionIndex);
-    sliced.sizes.insert(sliced.sizes.end(), sizes.begin() + dimensionIndex + 1,
-                        sizes.end());
-    sliced.strides.insert(sliced.strides.end(), strides.begin(),
-                          strides.begin() + dimensionIndex);
-    sliced.strides.insert(sliced.strides.end(),
-                          strides.begin() + dimensionIndex + 1, strides.end());
-    sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
-
-    return sliced;
-  }
-
-  // Merge Strides
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatten(size_t start,
-                                                size_t end) const {
-    assert(start <= strides.size() && end <= strides.size());
-    assert(start <= sizes.size() && end <= sizes.size());
-
-    Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatted;
-    flatted.data = data;
-    flatted.offset = offset;
-    flatted._totalItems = _totalItems;
-
-    flatted.strides.insert(flatted.strides.end(), strides.begin(),
-                           strides.begin() + start + 1);
-    flatted.strides.insert(flatted.strides.end(), strides.begin() + end + 1,
-                           strides.end());
-    flatted.sizes.insert(flatted.sizes.end(), sizes.begin(),
-                         sizes.begin() + start);
-    flatted.sizes.insert(flatted.sizes.end(), sizes.begin() + end, sizes.end());
-
-    for (size_t i = start; i != end; ++i) {
-      flatted.sizes.at(start) *= sizes[i];
+    
+    
+    // not static so that it can be called with . rather than ::
+    constexpr size_t get_rank() const { return R; }
+    
+    // direct accessors as for dynamic tensor
+    T& operator()(const size_t dimensions[R]) const {
+		T* ptr=start_ptr;
+		for(size_t i=0; i!=R; ++i) ptr += dimensions[i]*stride[i];
+		return *ptr;
+	}
+	T& at(const size_t dimensions[R]) const {
+		T* ptr=start_ptr;
+		for(size_t i=0; i!=R; ++i) {
+			assert(dimensions[i]<width[i]);
+			ptr += dimensions[i]*stride[i];
+			}
+		return *ptr;
+	}
+	
+	T& operator()(const std::vector<size_t>& dimensions) const { 
+        assert(dimensions.size()==R);
+        return operator()(&dimensions[0]); 
+    }
+    T& at(const std::vector<size_t>& dimensions) const { 
+        assert(dimensions.size()==R);
+        return at(&dimensions[0]); 
+    }
+	
+	// could use std::enable_if rather than static assert!
+	template<typename...Dims>
+	T& operator()(Dims...dimensions) const {
+        static_assert(sizeof...(dimensions)==R, "rank mismatch");
+        return operator()({static_cast<const size_t>(dimensions)...});
+    }
+	template<typename...Dims>
+	T& at(Dims...dimensions) const { 
+        static_assert(sizeof...(dimensions)==R, "rank mismatch");
+        return at({static_cast<const size_t>(dimensions)...});
+    }
+    
+    // specialized iterator type
+    typedef reserved::iterator<T,rank<R>> iterator;
+    
+    iterator begin()  { return iterator(width,stride,start_ptr); }
+    iterator end()  { 
+        iterator result = begin();
+        result.idx[0] = width[0];
+        result.ptr += width[0]*stride[0];
+        return result;
+    }
+    
+    // specialized index_iterator type
+    typedef reserved::index_iterator<T> index_iterator;
+    
+    index_iterator begin(size_t index, const size_t dimensions[R])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) - dimensions[index]*stride[index]); 
+    }
+    index_iterator end(size_t index, const size_t dimensions[R])  const { 
+        return index_iterator(stride[index], &operator()(dimensions) + (width[index]-dimensions[index])*stride[index]); 
+    }
+    
+    index_iterator begin(size_t index, const std::vector<size_t>& dimensions)  const { 
+        return index_iterator(stride[index], &operator()(dimensions) - dimensions[index]*stride[index]); 
+    }
+    index_iterator end(size_t index, const std::vector<size_t>& dimensions)  const { 
+        return index_iterator(stride[index], &operator()(dimensions) + (width[index]-dimensions[index])*stride[index]); 
     }
 
-    std::cout << "STRIDES: ";
-    for (auto&& i : flatted.strides) {
-      std::cout << i << ", ";
-    }
-    std::cout << std::endl;
+    // slicing operations return lower-rank tensors
+    tensor<T, rank<R-1>> slice(size_t index, size_t i) const {
+		assert(index<R);
+        tensor<T, rank<R-1>> result;
+        result.data=data;
+        for (size_t i=0; i!=index; ++i) {
+            result.width[i] = width[i];
+            result.stride[i] = stride[i];
+        }
+        for (size_t i=index; i!=R-1U; ++i) {
+            result.width[i] = width[i+1];
+            result.stride[i] = stride[i+1];
+        }
+        result.start_ptr = start_ptr+i*stride[index];
 
-    std::cout << "SIZES: ";
-    for (auto&& i : flatted.sizes) {
-      std::cout << i << ", ";
-    }
-    std::cout << std::endl;
-
-    return flatted;
-  }
+		return result;
+	}
+	tensor<T, rank<R-1>> operator[](size_t i) const { return slice(0,i); }
+	
+	
+	// window operations do not change rank
+	tensor<T,rank<R>> window(size_t index, size_t begin, size_t end) const {
+		tensor<T,rank<R>> result(*this);
+		result.width[index]=end-begin;
+		result.start_ptr += result.stride[index]*begin;
+		return result;
+	}
+	
+	tensor<T,rank<R>> window(const size_t begin[], const size_t end[]) const {
+		tensor<T,rank<R>> result(*this);
+		for (size_t i=0; i!=R; ++i) {
+			result.width[i]=end[i]-begin[i];
+			result.start_ptr += result.stride[i]*begin[i];
+		}
+		return result;
+	}	
+	tensor<T,dynamic> window(const std::vector<size_t>& begin, const std::vector<size_t>& end) const
+	{ return window(&begin[0], &end[0]); }
+	
+	// flatten operations change rank in a way that is not known at compile time
+	// would need a different interface to provide that info at compile time, 
+	// but the operation should not be time-critical
+	tensor<T,dynamic> flatten(size_t begin, size_t end) const {
+		tensor<T,dynamic> result;
+		result.stride.insert(result.stride.end(),stride.begin(),stride.begin()+begin);
+		result.stride.insert(result.stride.end(),stride.begin()+end,stride.end());
+		result.width.insert(result.width.end(),width.begin(),width.begin()+begin);
+		result.stride.insert(result.stride.end(),stride.begin()+end,stride.end());
+		for(size_t i=begin; i!=end; ++i) result.width[end]*=width[i];
+		result.start_prt=start_ptr;
+		result.data=data;
+		return result;
+	}
+        
+    
+    friend class tensor<T, rank<R+1>>;
+private:    
+    
+    tensor() = default; 
+    
+    std::shared_ptr<std::vector<T>> data;
+    typename rank<R>::width_type width;
+    typename rank<R>::index_type stride;
+    T* start_ptr;
 };
 
-template <typename ValueType, int Rank>
-class Tensor {
-  template <typename, int>
-  friend class Tensor;
 
- private:
-  using StandardIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, Rank>>;
-  using ConstIterator =
-      Iterator<typename InternalUtils::IteratorTypeConst<ValueType, Rank>>;
-  using ConstrainedIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, Rank>>;
-  using ConstrainedConstIterator =
-      Iterator<typename InternalUtils::IteratorTypeStandard<ValueType, Rank>>;
 
-  using StridesType = std::array<size_t, Rank>;
-  using SizesType = std::array<size_t, Rank>;
-  using DimensionsType = const std::array<size_t, Rank>&;
-  using InitializerDimensionsType = const std::array<size_t, Rank>&;
 
-  // Internal Data
-  std::shared_ptr<std::vector<ValueType>> data;
-  StridesType strides;
-  SizesType sizes;
-  size_t _totalItems;
-  size_t offset;
 
-  // Empty Constructor
-  Tensor()
-      : data(std::make_shared<std::vector<ValueType>>()),
-        _totalItems(0),
-        offset(0) {}
 
- public:
-  // Builder static method with varidic sizes
-  // Static method because of overload resolution
-  template <typename... Sizes>
-  static Tensor<ValueType, sizeof...(Sizes)> buildTensor(Sizes... sizes) {
-    static_assert(sizeof...(Sizes) == Rank);
 
-    Tensor<ValueType, sizeof...(Sizes)> tensor;
 
-    tensor.sizes =
-        std::array<size_t, sizeof...(Sizes)>{static_cast<size_t>(sizes)...};
-    tensor.offset = 0;
-    tensor.data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes...)));
-    InternalUtils::calcStrides(tensor.sizes, tensor.strides);
-    tensor._totalItems = (*(tensor.data)).size();
 
-    return tensor;
-  }
 
-  //
-  // Public Constructors
-  //
 
-  Tensor(const std::initializer_list<size_t>& sizes) : offset(0) {
-    assert(sizes.size() == Rank);
 
-    std::copy(sizes.begin(), sizes.end(), this->sizes.begin());
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(InternalUtils::calcDataSize(sizes)));
-    InternalUtils::calcStrides(this->sizes, strides);
-    _totalItems = (*data).size();
-  }
 
-  // Copy Constructor
-  Tensor(const Tensor<ValueType, DYNAMIC_TENSOR_TAG>& copy)
-      : data(std::make_shared<std::vector<ValueType>>(
-            std::vector<ValueType>(*copy.data))),
-        strides(copy.strides),
-        sizes(copy.sizes),
-        _totalItems(copy._totalItems),
-        offset(copy.offset) {
-    assert(copy.rank() == Rank);
-  }
 
-  // Copy Constructor
-  Tensor(const Tensor<ValueType, Rank>& copy)
-      : data(std::make_shared<std::vector<ValueType>>(
-            std::vector<ValueType>(*copy.data))),
-        strides(copy.strides),
-        sizes(copy.sizes),
-        _totalItems(copy._totalItems),
-        offset(copy.offset) {}
+// tensor specialization for rank 1
+// in this case splicing provides reference to data element
+template<typename T>
+class tensor<T, rank<1>>  {
+public:
 
-  // Move Constructor
-  Tensor(Tensor<ValueType, Rank>&& move)
-      : data(std::move(move.data)),
-        strides(move.strides),
-        sizes(move.sizes),
-        _totalItems(move._totalItems),
-        offset(move.offset) {}
-
-  // Move Constructor
-  Tensor(Tensor<ValueType, DYNAMIC_TENSOR_TAG>&& move)
-      : data(std::move(move.data)),
-        strides(move.strides),
-        sizes(move.sizes),
-        _totalItems(move._totalItems),
-        offset(move.offset) {
-    assert(move.rank() == Rank);
-  }
-
-  Tensor<ValueType, Rank>& operator=(const Tensor<ValueType, Rank>& copy) {
-    data = std::make_shared<std::vector<ValueType>>(
-        std::vector<ValueType>(*copy.data));
-    strides = copy.strides;
-    sizes = copy.sizes;
-    offset = copy.offset;
-    _totalItems = copy._totalItems;
-
-    return *this;
-  }
-
-  Tensor<ValueType, Rank>& operator=(Tensor<ValueType, Rank>&& move) {
-    data = std::move(move.data);
-    strides = move.strides;
-    sizes = move.sizes;
-    offset = move.offset;
-    _totalItems = move._totalItems;
-
-    return *this;
-  }
-
-  //
-  // Info Getters
-  //
-
-  constexpr size_t rank() const { return Rank; }
-  size_t size() const { return _totalItems; }
-  size_t sizeAt(size_t dimension) const { return sizes.at(dimension); }
-
-  //
-  // Iterators Initializers
-  //
-
-  StandardIterator begin() { return StandardIterator(*this, 0, strides[0]); }
-  StandardIterator end() {
-    return StandardIterator(*this, _totalItems * strides[0]);
-  }
-  ConstIterator cbegin() const { return ConstIterator(*this, 0, strides[0]); }
-  ConstIterator cend() const {
-    return ConstIterator(*this, _totalItems * strides[0]);
-  }
-
-  ConstrainedIterator constrained_begin(DimensionsType& coords) {
-    return ConstrainedIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[InternalUtils::findFixedIndex(coords)]);
-  }
-  ConstrainedIterator constrained_end(DimensionsType& coords) {
-    const auto variableIndex = InternalUtils::findFixedIndex(coords);
-    return ConstrainedIterator(*this,
-                               InternalUtils::calcFixedStartIndex(
-                                   strides, coords, sizes[variableIndex]),
-                               strides[variableIndex]);
-  }
-
-  ConstrainedIterator constrained_begin(DimensionsType& coords,
-                                        size_t variableIndex) {
-    return ConstrainedIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[variableIndex]);
-  }
-  ConstrainedIterator constrained_end(DimensionsType& coords,
-                                      size_t variableIndex) {
-    return ConstrainedIterator(*this,
-                               InternalUtils::calcFixedStartIndex(
-                                   strides, coords, sizes[variableIndex]),
-                               strides[variableIndex]);
-  }
-
-  ConstrainedConstIterator constrained_cbegin(DimensionsType& coords) {
-    return ConstrainedConstIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[InternalUtils::findFixedIndex(coords)]);
-  }
-  ConstrainedConstIterator constrained_cend(DimensionsType& coords) {
-    const auto variableIndex = InternalUtils::findFixedIndex(coords);
-    return ConstrainedConstIterator(*this,
-                                    InternalUtils::calcFixedStartIndex(
-                                        strides, coords, sizes[variableIndex]),
-                                    strides[variableIndex]);
-  }
-
-  ConstrainedConstIterator constrained_cbegin(DimensionsType& coords,
-                                              size_t variableIndex) {
-    return ConstrainedConstIterator(
-        *this, InternalUtils::calcFixedStartIndex(strides, coords),
-        strides[variableIndex]);
-  }
-  ConstrainedConstIterator constrained_cend(DimensionsType& coords,
-                                            size_t variableIndex) {
-    return ConstrainedConstIterator(*this,
-                                    InternalUtils::calcFixedStartIndex(
-                                        strides, coords, sizes[variableIndex]),
-                                    strides[variableIndex]);
-  }
-
-  //
-  // Access Operators, both linear and with coordinates
-  //
-
-  ValueType& operator[](const size_t linearCoord) {
-    return (*data)[linearCoord + offset];
-  }
-  ValueType& operator[](DimensionsType& coords) {
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data)[index];
-  }
-
-  ValueType& at(const size_t linearCoord) {
-    return (*data).at(linearCoord + offset);
-  }
-  ValueType& at(DimensionsType& coords) {
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data).at(index);
-  }
-
-  const ValueType& c_at(const size_t linearCoord) const {
-    return (*data).at(linearCoord + offset);
-  }
-  const ValueType& c_at(DimensionsType& coords) const {
-    auto index = InternalUtils::coordsToIndex(coords, strides) + offset;
-    return (*data).at(index);
-  }
-
-  //
-  // Manipulation functions
-  //
-
-  // Clones the tensor without sharing data
-  Tensor<ValueType, Rank> clone() const {
-    Tensor<ValueType, Rank> building;
-    building.data = std::make_shared<std::vector<ValueType>>(*data);
-    building.strides = strides;
-    building.sizes = sizes;
-    building.offset = offset;
-    building._totalItems = _totalItems;
-    return building;
-  }
-
-  // Clones the tensor sharing data
-  Tensor<ValueType, Rank> share() const {
-    Tensor<ValueType, Rank> building;
-    building.data = data;
-    building.strides = strides;
-    building.sizes = sizes;
-    building.offset = offset;
-    building._totalItems = _totalItems;
-    return building;
-  }
-
-  // Returns a slice of the tensor
-  Tensor<ValueType, Rank - 1> slice(size_t dimensionIndex,
-                                    size_t fixedDimensionValue) const {
-    assert(dimensionIndex < rank() &&
-           fixedDimensionValue <= sizes[dimensionIndex]);
-
-    Tensor<ValueType, Rank - 1> sliced;
-    sliced.data = data;
-    sliced.offset = offset + (fixedDimensionValue * strides[dimensionIndex]);
-
-    for (size_t index = 0; index < dimensionIndex; index++) {
-      sliced.strides[index] = strides[index];
-      sliced.sizes[index] = sizes[index];
+    tensor(size_t dimension) {
+        data=std::make_shared<std::vector<T>>(dimension);
+        start_ptr = &*(data->begin());
     }
-    for (size_t index = dimensionIndex + 1; index < strides.size(); index++) {
-      sliced.strides[index - 1] = strides[index];
-      sliced.sizes[index - 1] = sizes[index];
+    
+    // all tensor types are friend
+    // this are used by alien copy constructors, i.e. copy constructors copying different tensor types.
+    template<typename, typename> friend class tensor;
+    
+    constexpr size_t get_rank() const { return 1; }
+    
+    // direct accessors as for dynamic tensor
+    T& operator()(size_t d) const {
+		return start_ptr[d*stride[0]];
     }
-    sliced._totalItems = InternalUtils::calcDataSize(sliced.sizes);
-
-    return sliced;
-  }
-
-  // Merge Strides
-  // We can't return a fixed rank vector, since we can't know the resulting rank
-  Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatten(size_t start,
-                                                size_t end) const {
-    assert(start <= strides.size() && end <= strides.size());
-    assert(start <= sizes.size() && end <= sizes.size());
-
-    Tensor<ValueType, DYNAMIC_TENSOR_TAG> flatted;
-    flatted.data = data;
-    flatted.offset = offset;
-    flatted._totalItems = _totalItems;
-
-    flatted.strides.insert(flatted.strides.end(), strides.begin(),
-                           strides.begin() + start + 1);
-    flatted.strides.insert(flatted.strides.end(), strides.begin() + end + 1,
-                           strides.end());
-    flatted.sizes.insert(flatted.sizes.end(), sizes.begin(),
-                         sizes.begin() + start);
-    flatted.sizes.insert(flatted.sizes.end(), sizes.begin() + end, sizes.end());
-
-    for (size_t i = start; i != end; ++i) {
-      flatted.sizes.at(start) *= sizes[i];
+	T& at(size_t d) const { 
+		assert(d<width[0]);
+		return start_ptr[d*stride[0]];		
+    }   
+    
+    T& operator()(const size_t dimensions[1]) const {
+		return operator()(dimensions[0]);
+	}
+	T& at(const size_t dimensions[1]) const {
+		return operator()(dimensions[0]);
+	}
+	
+	T& operator()(const std::vector<size_t>& dimensions) const { 
+		assert(dimensions.size()==1);
+		return operator()(dimensions[0]);
     }
-
-    std::cout << "STRIDES: ";
-    for (auto&& i : flatted.strides) {
-      std::cout << i << ", ";
+    T& at(const std::vector<size_t>& dimensions) const { 
+		assert(dimensions.size()==1);
+		return operator()(dimensions[0]);
     }
-    std::cout << std::endl;
+	
+	// could use std::enable_if rather than static assert!
 
-    std::cout << "SIZES: ";
-    for (auto&& i : flatted.sizes) {
-      std::cout << i << ", ";
-    }
-    std::cout << std::endl;
 
-    return flatted;
-  }
+    
+    
+    T& slice(size_t index, size_t i) const {
+		assert(index==0);
+		return *(start_ptr + i*stride[0]);
+	}
+	T& operator[](size_t i)  { return *(start_ptr+i*stride[0]); }
+	
+	tensor<T,rank<1>> window(size_t begin, size_t end) const {
+		tensor<T,rank<1>> result(*this);
+		result.width[0]=end-begin;
+		result.start_ptr += result.stride[0]*begin;
+		return result;
+	}
+	
+	
+	typedef T* iterator;
+    iterator begin(size_t=0) { return start_ptr; }
+    iterator end(size_t=0) { return start_ptr + width[0]*stride[0]; }
+
+    
+    friend class tensor<T, rank<2>>;
+private:    
+    
+    tensor() = default; 
+    std::shared_ptr<std::vector<T>> data;
+    rank<1>::width_type width;
+    rank<1>::index_type stride;
+    T* start_ptr;
 };
 
-}  // namespace TensorLib
 
-#endif
+
+}; //namespace tensor
+
+#endif //TENSOR
+  
