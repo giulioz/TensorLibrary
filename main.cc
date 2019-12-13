@@ -34,4 +34,40 @@ int main() {
   for (auto iter = t2.begin(); iter != t2.end(); ++iter)
     std::cout << *iter << ' ';
   std::cout << '\n';
+
+  // ====================================================================
+
+  tensor::tensor<int> a(4, 4, 4);
+  tensor::tensor<int> b(4);
+
+  // const char i = 'i';
+  // const char j = 'j';
+  // const char k = 'k';
+  // a.ein<i, j, k>();
+  // a.ein<'i'>();
+  a.ein("ijk");
+
+  // tensor::tensor<int> c = a.ein<"ijk">() * b.ein("j");
+
+  // auto indexA = 1;
+  // auto indexB = 0;
+
+  // cik = Σj aijk bj
+  // tensor::tensor<int, tensor::rank<2>> c(4, 4);
+  // for (size_t i = 0; i < a.count(); i++) {
+
+  // }
+
+  // for (size_t i = 0; i < 4; i++) {
+  //   for (size_t j = 0; j < 4; j++) {
+  //     for (size_t k = 0; k < 4; k++) {
+  //       c(i, k) += a(i, j, k) * b(j);
+  //     }
+  //   }
+  // }
+
+  // tensor::tensor<int> c(4, 4);
+  // auto tr = c.sumIndices("ii");
+
+  // std::cout << "Trace:" << tr << std::endl;
 }

@@ -5,8 +5,12 @@
 #include <array>
 #include <cassert>
 #include <cstdlib>
+#include <functional>
 #include <initializer_list>
+#include <map>
 #include <memory>
+#include <numeric>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -31,6 +35,141 @@ struct rank {
 // tensor type
 template <typename T, class type = dynamic>
 class tensor;
+
+// ====================================================================
+
+template <char i>
+class index_type {
+ public:
+  char operator() { return i; }
+};
+
+// inline constexpr const char* unique_indices() { return ""; }
+
+// template <typename... Args>
+// constexpr const char* unique_indices(const char index, const Args... args) {
+//   return unique_indices(args...);
+// }
+
+constexpr const char* unique_indices(const char* indices) { return ""; }
+
+constexpr const char* unique_indices(const char* indices1,
+                                     const char* indices2) {
+  return "";
+}
+
+constexpr size_t indices_length(const char* indices) {
+  size_t l = 0;
+
+  while (*indices) {
+    l++;
+    indices++;
+  }
+
+  return l;
+}
+
+template <const char* indices, class T>
+class tensor_expression;
+
+template <const char* indices, class T>
+class tensor_constant;
+
+template <const char* indices, class T>
+class tensor_addition;
+
+template <const char* indices, class T>
+class tensor_multiplication;
+
+template <const char* indices, class T>
+class tensor_expression {
+  template <typename, typename>
+  friend class tensor;
+
+ protected:
+  const tensor<T>& t;
+
+  std::vector<char> free_indices, repeated_indices;
+  std::map<char, int> width;  // TODO: std::map?
+
+  // evaluate the expression with some given values for every repeated index (to
+  // be overriden in subclasses) it calls recursively the method evaluatePartial
+  // of the below expressions
+  virtual tensor<T, rank<indices_length(indices)>> evaluatePartial(
+      std::map<char, int> values) {  // TODO: std::map?
+  }
+
+ public:
+  // ctor from tensor with dynamic rank and size
+  template <const char* tensor_indices>
+  tensor_expression(const tensor<T>& t) : t(t) {
+    assert(indices_length(tensor_indices) == t.get_rank());
+
+    // assert sizeof...(tensor_indices) == t.get_rank()
+    // assert foreach i, j in indices, width[i] == width[j]
+    // save tensor_indices
+    // set free_indices from tensor_indices
+    // set repeated_indices from tensor_indices
+  }
+
+  // ctor from generic tensor
+  template <class type>
+  tensor_expression(const tensor<T, type>& t)
+      : tensor_expression(tensor<T>(t)) {}
+
+  // copy ctor
+  tensor_expression(const tensor_expression<indices, T>& t) = default;
+
+  // move ctor
+  tensor_expression(const tensor_expression<indices, T>&& t) = default;
+
+  // operator+
+  template <const char* indices1>
+  tensor_expression<unique_indices(indices, indices1), T> operator+(
+      const tensor_expression<indices1, T>& other) const {
+    // checks if the operation is possible (at runtime)
+
+    return tensor_addition<unique_indices(indices, indices1), T>(*this, other);
+  }
+
+  // operator*
+  template <const char* indices1>
+  tensor_expression<unique_indices(indices, indices1), T> operator*(
+      const tensor_expression<indices1, T>& other) const {
+    // checks if the operation is possible (at runtime)
+
+    return tensor_multiplication<unique_indices(indices, indices1), T>(*this,
+                                                                       other);
+  }
+
+  // evaluate the expression over every repeated index and sum all the partial
+  // results (to be overriden in subclasses) impl: it calls the method
+  // evaluatePartial of this
+  tensor<rank<indices_length(indices)>, T> evaluate() {}
+};
+
+template <const char* indices, class T>
+class tensor_constant : public tensor_expression<indices, T> {
+ protected:
+  virtual tensor<T, rank<indices_length(indices)>> evaluatePartial(
+      std::map<char, int> values) override {}
+};
+
+template <const char* indices, class T>
+class tensor_addition : public tensor_expression<indices, T> {
+ protected:
+  virtual tensor<T, rank<indices_length(indices)>> evaluatePartial(
+      std::map<char, int> values) override {}
+};
+
+template <const char* indices, class T>
+class tensor_multiplication : public tensor_expression<indices, T> {
+ protected:
+  virtual tensor<T, rank<indices_length(indices)>> evaluatePartial(
+      std::map<char, int> values) override {}
+};
+
+// ====================================================================
 
 namespace reserved {
 // generic iterator used by all tensor classes (except rank 1 specializations)
@@ -282,13 +421,13 @@ class tensor<T, dynamic> {
   T& operator()(const size_t dimensions[]) const {
     const size_t rank = width.size();
     T* ptr = start_ptr;
-    for (int i = 0; i != rank; ++i) ptr += dimensions[i] * stride[i];
+    for (size_t i = 0; i != rank; ++i) ptr += dimensions[i] * stride[i];
     return *ptr;
   }
   T& at(const size_t dimensions[]) const {
     const size_t rank = width.size();
     T* ptr = start_ptr;
-    for (int i = 0; i != rank; ++i) {
+    for (size_t i = 0; i != rank; ++i) {
       assert(dimensions[i] < width[i]);
       ptr += dimensions[i] * stride[i];
     }
@@ -360,7 +499,7 @@ class tensor<T, dynamic> {
   tensor<T, dynamic> window(const size_t begin[], const size_t end[]) const {
     tensor<T, dynamic> result(*this);
     const size_t r = get_rank();
-    for (int i = 0; i != r; ++i) {
+    for (size_t i = 0; i != r; ++i) {
       result.width[i] = end[i] - begin[i];
       result.start_ptr += result.stride[i] * begin[i];
     }
@@ -382,11 +521,37 @@ class tensor<T, dynamic> {
     result.width.insert(result.width.end(), width.begin(),
                         width.begin() + begin);
     result.width.insert(result.width.end(), width.begin() + end, width.end());
-    for (int i = begin; i != end; ++i) result.width[end] *= width[i];
-    result.start_prt = start_ptr;
+    for (size_t i = begin; i != end; ++i) result.width[end] *= width[i];
+    result.start_ptr = start_ptr;
     result.data = data;
     return result;
   }
+
+  // ====================================================================
+
+  template <const char* indices>
+  tensor(const tensor_expression<indices, T>& exp) {
+    assert(strlen(indices) == get_rank());
+    *this = exp.evaluate();
+  }
+
+  // template <const char... elements>
+  // tensor_expression<unique_indices(elements...), T> ein();
+
+  // template <const std::string& elements>
+  // tensor_expression<unique_indices(elements.c_str()), T> ein();
+
+  // template <const char* elements>
+  // tensor_expression<"", T> ein();
+
+  template <typename... Ts>
+  tensor_expression<test, T> ein(Ts... elements) {}
+
+  auto elements_count() {
+    return std::accumulate(width.begin(), width.end(), 0);
+  }
+
+  // ====================================================================
 
   // specialized iterator type
   typedef reserved::iterator<T, dynamic> iterator;
@@ -457,7 +622,7 @@ class tensor<T, rank<R>> {
     size_t *wptr = &(width[0]), *endp = &(width[0]) + R;
     while (wptr != endp) *(wptr++) = *(dimensions++);
     stride[R - 1] = 1;
-    for (int i = R - 1; i != 0; --i) {
+    for (size_t i = R - 1; i != 0; --i) {
       stride[i - 1] = stride[i] * width[i];
     }
     data = std::make_shared<std::vector<T>>(stride[0] * width[0]);
@@ -625,7 +790,7 @@ class tensor<T, rank<R>> {
     result.stride.insert(result.stride.end(), stride.begin() + end,
                          stride.end());
     for (size_t i = begin; i != end; ++i) result.width[end] *= width[i];
-    result.start_prt = start_ptr;
+    result.start_ptr = start_ptr;
     result.data = data;
     return result;
   }
