@@ -36,82 +36,101 @@ template <typename T, class type = dynamic> class tensor;
 
 // ====================================================================
 
-struct index_type {
-  char label;
-  size_t pos;
+template <char... Is> struct indices;
 
-  index_type(char label, size_t pos) : label(label), pos(pos) {}
+template <typename Sequence, typename Flag = void> struct unique_indices;
+
+template <typename A, typename B> struct concat_indices;
+
+template <char I, typename Sequence> struct find_index;
+
+template <char I, typename Sequence> struct remove_index;
+
+template <char... Is> struct indices {
+  constexpr static size_t size = sizeof...(Is);
+  constexpr static char values[sizeof...(Is)] = {Is...};
 };
 
-std::map<char, int> occurrences(const std::vector<char> &chars) {
-  std::map<char, int> occurrences;
-  for (auto &&c : chars) {
-    auto found = occurrences.find(c);
-    if (found == occurrences.end()) {
-      occurrences[c] = 0;
-    }
+template <char... Is> constexpr char indices<Is...>::values[sizeof...(Is)];
 
-    occurrences[c]++;
-  }
+template <> struct unique_indices<indices<>> { using value = indices<>; };
 
-  return occurrences;
-}
+template <char H, char... Ts>
+struct unique_indices<
+    indices<H, Ts...>,
+    typename std::enable_if<find_index<H, indices<Ts...>>::value>::type> {
+  using value = typename unique_indices<
+      typename remove_index<H, indices<Ts...>>::value>::value;
+};
 
-std::vector<char> unique_chars(const std::vector<char> &chars) {
-  auto occ = occurrences(chars);
+template <char H, char... Ts>
+struct unique_indices<
+    indices<H, Ts...>,
+    typename std::enable_if<!find_index<H, indices<Ts...>>::value>::type> {
+  using value = typename concat_indices<
+      indices<H>, typename unique_indices<indices<Ts...>>::value>::value;
+};
 
-  // std::cout << "occ: ";
-  //   for (auto&& i : occ) {
-  //     std::cout << i.first << ", ";
-  //   }
-  //   std::cout << std::endl;
+template <char... As, char... Bs>
+struct concat_indices<indices<As...>, indices<Bs...>> {
+  using value = indices<As..., Bs...>;
+};
 
-  std::vector<char> indices;
-  for (auto &&i : occ) {
-    if (i.second == 1) {
-      indices.push_back(i.first);
-    }
-  }
+template <char I> struct find_index<I, indices<>> {
+  constexpr static bool value = false;
+};
 
-  return indices;
-}
+template <char I, char... Ts> struct find_index<I, indices<I, Ts...>> {
+  constexpr static bool value = true;
+};
 
-std::vector<size_t> intersect_chars_pos(const std::vector<char> &chars) {
-  auto occ = occurrences(chars);
+template <char I, char H, char... Ts> struct find_index<I, indices<H, Ts...>> {
+  constexpr static bool value = find_index<I, indices<Ts...>>::value;
+};
 
-  std::vector<char> indices;
-  for (auto &&i : occ) {
-    if (i.second >= 2) {
-      indices.push_back(i.first);
-    }
-  }
+template <char I> struct remove_index<I, indices<>> {
+  using value = indices<>;
+};
 
-  std::vector<size_t> indices_pos;
-  for (auto &&i : indices) {
-    size_t pos = 0;
-    for (auto &&c : chars) {
-      if (c == i) {
-        indices_pos.push_back(pos);
-      }
-      pos++;
-    }
-  }
+template <char I, char... Ts> struct remove_index<I, indices<I, Ts...>> {
+  using value = typename remove_index<I, indices<Ts...>>::value;
+};
 
-  return indices_pos;
-}
+template <char I, char H, char... Ts>
+struct remove_index<I, indices<H, Ts...>> {
+  using value = typename concat_indices<
+      indices<H>, typename remove_index<I, indices<Ts...>>::value>::value;
+};
 
-template <typename T, class type> class tensor_constant;
+template <typename T, typename I> class tensor_expression;
 
-template <typename T, class type, typename FT, typename ST> class tensor_mult;
+template <typename T, typename I> class tensor_constant;
 
-template <typename T, class type> class tensor_expression {
-  // tensor_addition<T> operator+(const tensor_expression<T> &other);
+template <typename T, typename I> class tensor_addition;
 
-  // tensor_addition<T> operator-(const tensor_expression<T> &other);
+template <typename T, typename I> class tensor_negation;
 
-  // tensor_multiplication<T> operator*(const tensor_expression<T> &other);
+template <typename T, typename I> class tensor_multiplication;
 
-  tensor<T> evaluate() { // TODO: correct return type
+template <typename T, char... Is> class tensor_expression<T, indices<Is...>> {
+  template <char... Js>
+  tensor_addition<T, unique_indices<concat_indices<
+                         indices<Is...>, indices<Js...>>::value>::value>
+  operator+(const tensor_expression<T, indices<Js...>> &other);
+
+  tensor_addition<T, indices<Is...>> operator-();
+
+  template <char... Js>
+  tensor_addition<T, unique_indices<concat_indices<
+                         indices<Is...>, indices<Js...>>::value>::value>
+  operator-(const tensor_expression<T, indices<Js...>> &other);
+
+  template <char... Js>
+  tensor_addition<T, unique_indices<concat_indices<
+                         indices<Is...>, indices<Js...>>::value>::value>
+  operator*(const tensor_expression<T, indices<Js...>> &other);
+
+  tensor<T, rank<sizeof...(Is)>> evaluate() {
     auto free_indices = get_free_indices();
     auto repeated_indices = get_repeated_indices();
 
@@ -131,7 +150,7 @@ template <typename T, class type> class tensor_expression {
       summation_size *= d;
     }
 
-    tensor<T> result(result_dims);
+    tensor<T, rank<sizeof...(Is)>> result(result_dims);
 
     for (int i = 0; i < result_size; i++) {
       auto result_index = calc_index(i, result_dims);
@@ -149,6 +168,16 @@ template <typename T, class type> class tensor_expression {
     return result;
   }
 
+protected:
+  virtual T evaluate_partial(std::map<char, size_t> index_map) const = 0;
+
+  virtual std::vector<char> get_free_indices() const = 0;
+
+  virtual std::vector<char> get_repeated_indices() const = 0;
+
+  virtual size_t get_dimension(char i) const = 0;
+
+private:
   std::vector<size_t> calc_index(size_t i, std::vector<size_t> dims) {
     std::vector<size_t> result;
 
@@ -177,107 +206,45 @@ template <typename T, class type> class tensor_expression {
 
     return result;
   }
-
-protected:
-  virtual T evaluate_partial(std::map<char, size_t> index_map) const = 0;
-  virtual std::vector<char> get_free_indices() const = 0;
-  virtual std::vector<char> get_repeated_indices() const = 0;
-  virtual size_t get_dimension(char i) const = 0;
 };
 
-template <typename T, class type>
-class tensor_constant : public tensor_expression<T, type> {
-  template <typename, class, typename, typename> friend class tensor_mult;
+template <typename T, char... Is>
+class tensor_constant<T, indices<Is...>>
+    : public tensor_expression<T, indices<Is...>> {
+public:
+  // TODO: ctor with static rank tensor
+  tensor_constant(const tensor<T> &tensorRef, const std::vector<char> &indices)
+      : tensorRef(tensorRef), indices(indices) {}
 
+  std::vector<char> get_free_indices() const {
+    return std::vector<char>{Is...};
+  }
+
+  std::vector<char> get_repeated_indices() const {
+    return std::vector<char>; // TODO
+  }
+
+  size_t get_dimension(char i) const {
+    return 0; // TODO
+  }
+
+private:
+  const tensor<T> &tensorRef;
   std::vector<char> indices;
-  const tensor<T, type> &tensorRef;
-
-public:
-  tensor_constant(const char *indices, const tensor<T, type> &tensorRef)
-      : indices(indices, indices + strlen(indices)), tensorRef(tensorRef) {}
-
-  tensor<T, type> evaluate() const { return tensorRef; }
-
-  std::vector<char> get_indices() const { return indices; }
-  std::vector<char> get_free_indices() const { return unique_chars(indices); }
-  std::vector<size_t> get_repeated_indices_i() const {
-    return intersect_chars_pos(indices);
-  }
-
-  std::vector<size_t>
-  calc_dimensions(const std::vector<char> &actual_free_indices) const {
-    std::vector<size_t> dims;
-
-    for (auto &i : actual_free_indices) {
-      auto i_iter = std::find(indices.begin(), indices.end(), i);
-      dims.push_back(
-          i_iter != indices.end()
-              ? tensorRef.width[std::distance(indices.begin(), i_iter)]
-              : 1);
-    }
-
-    return dims;
-  }
-
-  template <typename ST>
-  tensor_mult<T, type, tensor_constant<T, type>, ST> operator*(ST other) const {
-    return tensor_mult<T, type, tensor_constant<T, type>, ST>(*this, other);
-  };
 };
 
-template <typename T, class type, typename FT, typename ST>
-class tensor_mult : public tensor_expression<T, type> {
-  const FT first;
-  const ST second;
-
+template <typename T, char... Is, typename FT, typename ST>
+class tensor_multiplication<T, indices<Is...>>
+    : public tensor_expression<T, indices<Is...>> {
 public:
-  tensor_mult(const FT first, const ST second) : first(first), second(second) {}
+  tensor_multiplication(const FT first, const ST second)
+      : first(first), second(second) {}
 
-  tensor<T, type> evaluate() const {
-    auto evFirst = first.evaluate();
-    auto evSecond = second.evaluate();
-
-    auto indices = get_free_indices();
-    auto dims = calc_dimensions(indices);
-
-    tensor<T, type> newTensor(dims);
-    auto toIterCount = newTensor.elements_count();
-
-    // std::vector<size_t> repeatedIndicesIFirst =
-    //     intersect_chars_pos(first.get_indices());
-    // std::vector<size_t> repeatedIndicesISecond =
-    //     intersect_chars_pos(second.get_indices());
-    // std::vector<size_t> repeatedIndicesCount(repeatedIndicesIFirst.size());
-
-    // std::cout << "repeatedIndicesIFirst: ";
-    // for (auto&& i : repeatedIndicesIFirst) {
-    //   std::cout << i << ", ";
-    // }
-    // std::cout << std::endl;
-
-    // // ∑_j a_ijk * b_j = c_ik
-    // for (size_t i = 0; i < count; i++)
-    // {
-    //   auto coords = calc_coords(); // i,j,k
-    // }
-
-    // for (i, j, k) {
-    //   newTensor(i, k) += a(i, j, k) * b(j);
-    // }
-
-    // for (size_t repeatedStage = 0; repeatedStage <
-    // repeatedIndicesCount.size();
-    //      repeatedStage++) {
-    //   for (size_t index = 0; index < toIterCount; index++) {
-    //     auto indicesDest = newTensor.build_index(index);
-
-    //     newTensor(indicesDest) += a(i, j, k) * b(j);
-    //   }
-    // }
-
-    return newTensor;
+  T evaluate_partial(const std::map<char, int> &index_map) {
+    return first.evaluate_partial(index_map) * second.evaluate_partial(index_map);
   }
 
+  /*
   std::vector<char> get_indices() const {
     auto indicesFirst = first.get_free_indices();
     auto indicesSecond = second.get_free_indices();
@@ -288,9 +255,10 @@ public:
     joined.insert(joined.end(), indicesSecond.begin(), indicesSecond.end());
 
     return joined;
-  }
+  }*/
 
   std::vector<char> get_free_indices() const {
+    /*
     auto indicesFirst = first.get_free_indices();
     auto indicesSecond = second.get_free_indices();
 
@@ -300,27 +268,29 @@ public:
     joined.insert(joined.end(), indicesSecond.begin(), indicesSecond.end());
 
     return unique_chars(joined);
+    */
+
+    return std::vector<char>{Is...};
   }
 
-  std::vector<size_t>
-  calc_dimensions(const std::vector<char> &actual_free_indices) const {
-    auto dimsFirst = first.calc_dimensions(actual_free_indices),
-         dimsSecond = second.calc_dimensions(actual_free_indices);
-
-    std::vector<size_t> dims;
-    for (size_t i = 0; i < actual_free_indices.size(); i++) {
-      dims.push_back(dimsFirst[i] * dimsSecond[i]);
-    }
-
-    return dims;
+  std::vector<char> get_repeated_indices() const {
+    return std::vector<char>; // TODO
   }
 
-  template <typename STb>
-  tensor_mult<T, type, tensor_mult<T, type, FT, ST>, STb>
-  operator*(ST other) const {
-    return tensor_mult<T, type, tensor_mult<T, type, FT, ST>, STb>(*this,
-                                                                   other);
-  };
+  size_t get_dimension(char i) const {
+    return 0; // TODO
+  }
+
+private:
+  const FT first;
+  const ST second;
+
+  // template <typename STb>
+  // tensor_mult<T, type, tensor_mult<T, type, FT, ST>, STb> operator*(
+  //     ST other) const {
+  //   return tensor_mult<T, type, tensor_mult<T, type, FT, ST>, STb>(*this,
+  //                                                                  other);
+  // };
 };
 
 // ====================================================================
