@@ -251,13 +251,13 @@ template <typename T, char... Is>
 class tensor_constant<T, vars<Is...>>
     : public tensor_expression<T, tensor_constant<T, vars<Is...>>> {
 public:
-  tensor_constant(const tensor<T> &tensorRef) : tensorRef(tensorRef) {}
+  tensor_constant(const tensor<T> &tensorCopy) : tensorCopy(tensorCopy) {}
 
   template <size_t N>
   tensor_constant(
-      const tensor<T, rank<N>> &tensorRef,
+      const tensor<T, rank<N>> &tensorCopy,
       typename std::enable_if<N == sizeof...(Is), bool>::type = true)
-      : tensorRef(tensorRef) {}
+      : tensorCopy(tensorCopy) {}
 
 protected:
   T evaluate_part(const std::map<char, size_t> &vars_values) const override {
@@ -265,13 +265,13 @@ protected:
     for (size_t i = 0; i < vars<Is...>::size; i++) {
       indexes.push_back(vars_values.at(vars<Is...>::id[i]));
     }
-    return tensor(indexes);
+    return tensorCopy(indexes);
   }
 
   size_t get_dimension(char v) const override {
     for (size_t i = 0; i < vars<Is...>::size; i++) {
       if (v == vars<Is...>::id[i]) {
-        return tensorRef.width[i];
+        return tensorCopy.width[i];
       }
     }
     return -1;
@@ -280,7 +280,7 @@ protected:
   friend class tensor<T>;
 
 private:
-  const tensor<T> tensorRef;
+  const tensor<T> tensorCopy;
 };
 
 template <typename T, typename A, typename B>
