@@ -1,167 +1,91 @@
 #include <chrono>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 #include "Tensor.hpp"
 
+template <typename T> void fill_tensor_i(T &tensor, int i = 0) {
+  for (auto &ai : tensor) {
+    ai = i;
+    i++;
+  }
+}
+
+template <class TensorType>
+void printTensor(const TensorType &t, std::ostream &stream = std::cout) {
+  for (auto iterator = t.begin(); iterator != t.end(); iterator++) {
+    stream << *iterator << ", ";
+  }
+
+  stream << std::endl;
+}
+
+template <class TensorType>
+void assertTensorValues(const TensorType &tensor, std::string expected) {
+  std::stringstream buffer;
+  printTensor(tensor, buffer);
+  assert(buffer.str().compare(expected) == 0);
+}
+
+void test1() {
+  std::cout << "Test1:" << std::endl;
+
+  tensor::tensor<int> a(4, 3, 4);
+  fill_tensor_i(a, 0);
+  tensor::tensor<int> b(3);
+  fill_tensor_i(b, 0);
+  auto exp = a.ein("ijk") * b.ein("j");
+  tensor::tensor<int> c = exp.evaluate();
+  printTensor(c);
+  assertTensorValues(c, "20, 23, 26, 29, 56, 59, 62, 65, 92, 95, 98, 101, 128, 131, 134, 137, \n");
+
+  std::cout << std::endl;
+}
+
+void test2() {
+  // std::cout << "Test2:" << std::endl;
+
+  // tensor::tensor<int> a(4);
+  // fill_tensor_i(a, 0);
+  // tensor::tensor<int> b(4);
+  // fill_tensor_i(b, 100);
+  // auto exp = a.ein<'i'>() * b.ein<'i'>();
+  // tensor::tensor<int> c = exp.evaluate();
+  // printTensor(c);
+
+  // std::cout << std::endl;
+}
+
+void test3() {
+  // std::cout << "Test3:" << std::endl;
+
+  // tensor::tensor<int> a(6);
+  // fill_tensor_i(a, 0);
+  // auto exp = a.ein<'i'>() * a.ein<'i'>();
+  // tensor::tensor<int> c = exp.evaluate();
+  // printTensor(c);
+
+  // std::cout << std::endl;
+}
+
+void test4() {
+  // std::cout << "Test4:" << std::endl;
+
+  // tensor::tensor<int> a(6);
+  // fill_tensor_i(a, 0);
+  // auto exp = a.ein<'i', 'i'>();
+  // tensor::tensor<int> c = exp.evaluate();
+  // printTensor(c);
+
+  // std::cout << std::endl;
+}
+
 int main() {
-  tensor::tensor<int> td(2, 2, 3);
-  tensor::tensor<int, tensor::rank<3>> tr(2, 2, 3);
+  test1();
+  test2();
+  test3();
+  test4();
 
-  int count = 0;
-  tensor::tensor<int> t2 = td;
-  for (auto iter = t2.begin(); iter != t2.end(); ++iter) *iter = count++;
-
-  t2 = tr;
-  for (auto iter = t2.begin(); iter != t2.end(); ++iter) *iter = count++;
-
-  for (auto iter = td.begin(); iter != td.end(); ++iter)
-    std::cout << *iter << ' ';
-  std::cout << '\n';
-
-  for (auto iter = tr.begin(); iter != tr.end(); ++iter)
-    std::cout << *iter << ' ';
-  std::cout << '\n';
-
-  for (auto iter = tr.begin(2, {0, 0, 1}); iter != tr.end(2, {0, 0, 1}); ++iter)
-    std::cout << *iter << ' ';
-  std::cout << '\n';
-
-  for (auto iter = td.begin(1, {0, 0, 1}); iter != td.end(1, {0, 0, 1}); ++iter)
-    std::cout << *iter << ' ';
-  std::cout << '\n';
-
-  t2 = td.window(2, 0, 2);
-  for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-    std::cout << *iter << ' ';
-  std::cout << '\n';
-
-  //*
-  const int rep = 1000;
-  const int size = 100;
-  tensor::tensor<int, tensor::rank<2>> A(size, size);
-  {
-    std::cout << "ranked tensor:\n";
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i)
-        for (int j = 0; j != size; ++j) A[i][j] += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "multi-slice elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i)
-        for (int j = 0; j != size; ++j) A(i, j) += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "direct-access elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i) {
-        auto Ai = A[i];
-        for (int j = 0; j != size; ++j) Ai[j] += 1;
-      }
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "stored-slice elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    std::cout << "ranked iterator:\n";
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      const auto Aend = A.end();
-      for (auto iter = A.begin(); iter != Aend; ++iter) *iter += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-  }
-
-  int B[size][size];
-  {
-    std::cout << "standard array:\n";
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i)
-        for (int j = 0; j != size; ++j) B[i][j] += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "multi-slice elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i) {
-        auto Bi = B[i];
-        for (int j = 0; j != size; ++j) Bi[j] += 1;
-      }
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "stored-slice elapsed time: " << elapsed_time << '\n';
-  }
-
-  tensor::tensor<int> C(size, size);
-  {
-    std::cout << "generic tensor:\n";
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i)
-        for (int j = 0; j != size; ++j) C(i, j) += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "direct-access elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      for (int i = 0; i != size; ++i) {
-        auto Ci = C[i];
-        for (int j = 0; j != size; ++j) Ci(j) += 1;
-      }
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "stored-slice elapsed time: " << elapsed_time << '\n';
-  }
-  {
-    std::cout << "generic iterator:\n";
-    auto start_time = std::chrono::high_resolution_clock::now();
-    for (int n = 0; n != rep; ++n) {
-      const auto Cend = C.end();
-      for (auto iter = C.begin(); iter != Cend; ++iter) *iter += 1;
-    }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-  }
-
-  //*/
+  return 0;
 }

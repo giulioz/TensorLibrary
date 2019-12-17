@@ -6,7 +6,9 @@
 #include <cassert>
 #include <cstdlib>
 #include <initializer_list>
+#include <map>
 #include <memory>
+#include <numeric>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -33,6 +35,7 @@ template <typename T, class type = dynamic>
 class tensor;
 
 namespace reserved {
+
 // generic iterator used by all tensor classes (except rank 1 specializations)
 template <typename T, class type>
 class iterator {
@@ -224,12 +227,258 @@ class index_iterator {
   size_t stride;
   T* ptr;
 };
+
+std::map<char, int> occurrences(const std::vector<char>& chars) {
+  std::map<char, int> occurrences;
+  for (auto&& c : chars) {
+    auto found = occurrences.find(c);
+    if (found == occurrences.end()) {
+      occurrences[c] = 0;
+    }
+
+    occurrences[c]++;
+  }
+
+  return occurrences;
+}
+
+std::vector<char> calc_free_indices(const std::vector<char>& indices) {
+  auto occ = occurrences(indices);
+
+  std::vector<char> indicesNew;
+  for (auto&& i : occ) {
+    if (i.second == 1) {
+      indicesNew.push_back(i.first);
+    }
+  }
+
+  return indicesNew;
+}
+
+std::vector<char> calc_repeated_indices(const std::vector<char>& indices) {
+  auto occ = occurrences(indices);
+
+  std::vector<char> indicesNew;
+  for (auto&& i : occ) {
+    if (i.second >= 2) {
+      indicesNew.push_back(i.first);
+    }
+  }
+
+  return indicesNew;
+}
+
+template <typename CoordsType>
+void calc_strides(const CoordsType& dimensions, std::vector<size_t>& strides) {
+  size_t stride = 1;
+  size_t i = 0;
+  for (auto&& dim : dimensions) {
+    strides.push_back(stride);
+    stride *= dim;
+    ++i;
+  }
+}
+
+std::vector<char> setify(const std::vector<char>& indices) {
+  auto occ = occurrences(indices);
+
+  std::vector<char> indicesNew;
+  for (auto&& i : occ) {
+    indicesNew.push_back(i.first);
+  }
+
+  return indicesNew;
+}
+
+std::vector<size_t> build_index(size_t i, std::vector<size_t> width) {
+  std::vector<size_t> stride;
+  calc_strides(width, stride);
+  std::vector<size_t> result;
+
+  for (size_t k = 0; k < stride.size(); k++) {
+    result.push_back((i / stride[k]) % width[k]);
+  }
+
+  return result;
+}
+
+template <typename T, typename FT, typename ST>
+class tensor_mult;
+
+template <typename T>
+class tensor_constant {
+ public:
+  const tensor<T>& tensorRef;
+  std::vector<char> indices;
+
+  tensor_constant(const tensor<T>& tensorRef, const std::vector<char>& indices)
+      : tensorRef(tensorRef), indices(indices) {}
+
+  tensor<T> evaluate() { return tensorRef; }
+
+  std::vector<char> free_indices() { return calc_free_indices(indices); }
+
+  size_t index_dimension(char index) {
+    size_t i = 0;
+    while (i < indices.size() && indices.at(i) != index) {
+      i++;
+    }
+
+    if (i < indices.size()) {
+      return tensorRef.width[i];
+    } else {
+      return -1;
+    }
+  }
+
+  template <typename ST>
+  tensor_mult<T, tensor_constant<T>, ST> operator*(const ST& other) {
+    return tensor_mult<T, tensor_constant<T>, ST>(*this, other);
+  }
+};
+
+template <typename T, typename FT, typename ST>
+class tensor_mult {
+ public:
+  FT fst;
+  ST snd;
+
+  tensor_mult(const FT& fst, const ST& snd) : fst(fst), snd(snd) {}
+
+  tensor<T> evaluate() {
+    auto fst_val = fst.evaluate();
+    auto snd_val = snd.evaluate();
+    auto fst_indices = fst.free_indices();
+    auto snd_indices = snd.free_indices();
+
+    auto indices = all_indices();
+    auto all_dims = calc_dimensions(indices);
+    size_t total_count = std::accumulate(all_dims.begin(), all_dims.end(), 1,
+                                         std::multiplies<double>());
+
+    auto dest_indices = free_indices();
+    auto dest_dims = calc_dimensions(dest_indices);
+
+    // std::cout << "dest_dims: ";
+    // for (auto&& dim : dest_dims) {
+    //   std::cout << dim << ", ";
+    // }
+    // std::cout << std::endl;
+    // std::cout << std::endl;
+
+    tensor<T> new_tensor(dest_dims);
+
+    for (size_t i = 0; i < total_count; i++) {
+      std::vector<size_t> dim_index = build_index(i, all_dims);
+
+      std::vector<size_t> dest_index =
+          swap_indices(indices, dim_index, dest_indices);
+      std::vector<size_t> fst_index =
+          swap_indices(indices, dim_index, fst_indices);
+      std::vector<size_t> snd_index =
+          swap_indices(indices, dim_index, snd_indices);
+
+      // std::cout << "dim_index: ";
+      // for (auto&& dim : dim_index) {
+      //   std::cout << dim << ", ";
+      // }
+      // std::cout << std::endl;
+      // std::cout << "dest_index: ";
+      // for (auto&& dim : dest_index) {
+      //   std::cout << dim << ", ";
+      // }
+      // std::cout << std::endl;
+      // std::cout << "fst_index: ";
+      // for (auto&& dim : fst_index) {
+      //   std::cout << dim << ", ";
+      // }
+      // std::cout << std::endl;
+      // std::cout << "snd_index: ";
+      // for (auto&& dim : snd_index) {
+      //   std::cout << dim << ", ";
+      // }
+      // std::cout << std::endl;
+      // std::cout << new_tensor(dest_index) << "+=" << fst_val(fst_index) << "*"
+      //           << snd_val(snd_index) << std::endl;
+      // std::cout << std::endl;
+
+      new_tensor(dest_index) += fst_val(fst_index) * snd_val(snd_index);
+    }
+
+    return new_tensor;
+  }
+
+  std::vector<size_t> swap_indices(const std::vector<char>& source_chars,
+                                   const std::vector<size_t>& source_indices,
+                                   const std::vector<char>& dest_chars) {
+    std::vector<size_t> dest;
+
+    for (size_t i = 0; i < source_chars.size(); i++) {
+      for (size_t j = 0; j < dest_chars.size(); j++) {
+        if (source_chars.at(i) == dest_chars.at(j)) {
+          dest.push_back(source_indices.at(i));
+        }
+      }
+    }
+
+    return dest;
+  }
+
+  std::vector<size_t> calc_dimensions(const std::vector<char>& indices) {
+    std::vector<size_t> dims;
+
+    for (size_t i = 0; i < indices.size(); i++) {
+      auto dim_fst = fst.index_dimension(indices[i]);
+      auto dim_snd = snd.index_dimension(indices[i]);
+
+      if (dim_fst > 0) {
+        dims.push_back(dim_fst);
+      } else if (dim_snd > 0) {
+        dims.push_back(dim_snd);
+      } else {
+        // unexpected error!
+        dims.push_back(0);
+      }
+    }
+
+    return dims;
+  }
+
+  std::vector<char> joined_indices() {
+    auto indicesFst = fst.free_indices();
+    auto indicesSnd = snd.free_indices();
+
+    std::vector<char> joined;
+    joined.reserve(indicesFst.size() + indicesSnd.size());
+    joined.insert(joined.end(), indicesFst.begin(), indicesFst.end());
+    joined.insert(joined.end(), indicesSnd.begin(), indicesSnd.end());
+
+    return joined;
+  }
+
+  std::vector<char> free_indices() {
+    return calc_free_indices(joined_indices());
+  }
+
+  std::vector<char> all_indices() { return setify(joined_indices()); }
+
+  template <typename ST2>
+  tensor_mult<T, tensor_mult<T, FT, ST>, ST2> operator*(const ST2& other) {
+    return tensor_mult<T, tensor_mult<T, FT, ST>, ST2>(*this, other);
+  }
+};
+
 }  // namespace reserved
 
 // tensor specialization for dynamic rank
 template <typename T>
 class tensor<T, dynamic> {
  public:
+  reserved::tensor_constant<T> ein(const char* indices) {
+    return reserved::tensor_constant<T>(
+        *this, std::vector<char>(indices, indices + strlen(indices)));
+  }
+
   // C-style constructor with explicit rank and pointer to array of dimensions
   // all other constructors are redirected to this one
   tensor(size_t rank, const size_t dimensions[])
@@ -282,13 +531,13 @@ class tensor<T, dynamic> {
   T& operator()(const size_t dimensions[]) const {
     const size_t rank = width.size();
     T* ptr = start_ptr;
-    for (int i = 0; i != rank; ++i) ptr += dimensions[i] * stride[i];
+    for (size_t i = 0; i != rank; ++i) ptr += dimensions[i] * stride[i];
     return *ptr;
   }
   T& at(const size_t dimensions[]) const {
     const size_t rank = width.size();
     T* ptr = start_ptr;
-    for (int i = 0; i != rank; ++i) {
+    for (size_t i = 0; i != rank; ++i) {
       assert(dimensions[i] < width[i]);
       ptr += dimensions[i] * stride[i];
     }
@@ -360,7 +609,7 @@ class tensor<T, dynamic> {
   tensor<T, dynamic> window(const size_t begin[], const size_t end[]) const {
     tensor<T, dynamic> result(*this);
     const size_t r = get_rank();
-    for (int i = 0; i != r; ++i) {
+    for (size_t i = 0; i != r; ++i) {
       result.width[i] = end[i] - begin[i];
       result.start_ptr += result.stride[i] * begin[i];
     }
@@ -438,7 +687,7 @@ class tensor<T, dynamic> {
                            (width[index] - dimensions[index]) * stride[index]);
   }
 
- private:
+  //  private:
   tensor() = default;
 
   std::shared_ptr<std::vector<T>> data;
