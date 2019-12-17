@@ -1,65 +1,90 @@
 #include <chrono>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 #include "Tensor.hpp"
 
-int main() {
-  // tensor::tensor<int> td(2, 2, 3);
-  // tensor::tensor<int, tensor::rank<3>> tr(2, 2, 3);
-
-  // int count = 0;
-  // tensor::tensor<int> t2 = td;
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter) *iter = count++;
-
-  // t2 = tr;
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter) *iter = count++;
-
-  // for (auto iter = td.begin(); iter != td.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  // for (auto iter = tr.begin(); iter != tr.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  // for (auto iter = tr.begin(2, {0, 0, 1}); iter != tr.end(2, {0, 0, 1});
-  // ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  // for (auto iter = td.begin(1, {0, 0, 1}); iter != td.end(1, {0, 0, 1});
-  // ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  // t2 = td.window(2, 0, 2);
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  // ====================================================================
-
-  int i = 0;
-
-  tensor::tensor<int> a(4, 4, 4);
-  for (auto &ai : a) {
+template <typename T> void fill_tensor_i(T &tensor, int i = 0) {
+  for (auto &ai : tensor) {
     ai = i;
     i++;
   }
+}
 
-  i = 100;
+template <class TensorType>
+void printTensor(const TensorType &t, std::ostream &stream = std::cout) {
+  for (auto iterator = t.begin(); iterator != t.end(); iterator++) {
+    stream << *iterator << ", ";
+  }
+
+  stream << std::endl;
+}
+
+template <class TensorType>
+void assertTensorValues(const TensorType &tensor, std::string expected) {
+  std::stringstream buffer;
+  printTensor(tensor, buffer);
+  assert(buffer.str().compare(expected) == 0);
+}
+
+void test1() {
+  std::cout << "Test1:" << std::endl;
+
+  tensor::tensor<int> a(4, 4, 4);
+  fill_tensor_i(a, 0);
   tensor::tensor<int> b(4);
-  for (auto &bi : b) {
-    bi = i;
-    i++;
-  }
-
-  auto exp = a.ein("ijk") * b.ein("j");
-
+  fill_tensor_i(b, 100);
+  auto exp = a.ein<'i', 'j', 'k'>() * b.ein<'j'>();
   tensor::tensor<int> c = exp.evaluate();
-  std::cout << "Values: ";
-  for (auto &&i : c) {
-    std::cout << i << ", ";
-  }
+  printTensor(c);
+
   std::cout << std::endl;
+}
+
+void test2() {
+  std::cout << "Test2:" << std::endl;
+
+  tensor::tensor<int> a(4);
+  fill_tensor_i(a, 0);
+  tensor::tensor<int> b(4);
+  fill_tensor_i(b, 100);
+  auto exp = a.ein<'i'>() * b.ein<'i'>();
+  tensor::tensor<int> c = exp.evaluate();
+  printTensor(c);
+
+  std::cout << std::endl;
+}
+
+void test3() {
+  std::cout << "Test3:" << std::endl;
+
+  tensor::tensor<int> a(6);
+  fill_tensor_i(a, 0);
+  auto exp = a.ein<'i'>() * a.ein<'i'>();
+  tensor::tensor<int> c = exp.evaluate();
+  printTensor(c);
+
+  std::cout << std::endl;
+}
+
+void test4() {
+  std::cout << "Test4:" << std::endl;
+
+  tensor::tensor<int> a(6);
+  fill_tensor_i(a, 0);
+  auto exp = a.ein<'i', 'i'>();
+  tensor::tensor<int> c = exp.evaluate();
+  printTensor(c);
+
+  std::cout << std::endl;
+}
+
+int main() {
+  test1();
+  test2();
+  test3();
+  test4();
+
+  return 0;
 }
