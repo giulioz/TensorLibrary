@@ -405,8 +405,8 @@ class tensor_op {
 
       return new_tensor;
     } else {
-      // if the dimensions are =0, return a scalar instead (encapsulated in a
-      // tensor)
+      // if the dimensions are =0, return a scalar instead
+      // (encapsulated in a 1-rank 1-element tensor)
       T dest_scalar = 0;
 
       for (size_t i = 0; i < total_count; i++) {
