@@ -302,8 +302,33 @@ std::vector<size_t> build_index(size_t i, std::vector<size_t> width) {
   return result;
 }
 
-template <typename T, typename FT, typename ST>
-class tensor_mult;
+std::vector<size_t> swap_indices(const std::vector<char>& source_chars,
+                                 const std::vector<size_t>& source_indices,
+                                 const std::vector<char>& dest_chars) {
+  std::vector<size_t> dest;
+
+  for (size_t i = 0; i < source_chars.size(); i++) {
+    for (size_t j = 0; j < dest_chars.size(); j++) {
+      if (source_chars.at(i) == dest_chars.at(j)) {
+        dest.push_back(source_indices.at(i));
+      }
+    }
+  }
+
+  return dest;
+}
+
+template <typename T, typename FT, typename ST, typename OP>
+class tensor_op;
+
+template <typename T>
+struct op_sum {
+  static T apply(T a, T b) { return a * b; }
+};
+template <typename T>
+struct op_mult {
+  static T apply(T a, T b) { return a * b; }
+};
 
 template <typename T>
 class tensor_constant {
@@ -332,96 +357,70 @@ class tensor_constant {
   }
 
   template <typename ST>
-  tensor_mult<T, tensor_constant<T>, ST> operator*(const ST& other) {
-    return tensor_mult<T, tensor_constant<T>, ST>(*this, other);
+  tensor_op<T, tensor_constant<T>, ST, op_sum<T>> operator+(const ST& other) {
+    return tensor_op<T, tensor_constant<T>, ST, op_sum<T>>(*this, other);
+  }
+
+  template <typename ST>
+  tensor_op<T, tensor_constant<T>, ST, op_mult<T>> operator*(const ST& other) {
+    return tensor_op<T, tensor_constant<T>, ST, op_mult<T>>(*this, other);
   }
 };
 
-template <typename T, typename FT, typename ST>
-class tensor_mult {
+template <typename T, typename FT, typename ST, typename OP>
+class tensor_op {
  public:
   FT fst;
   ST snd;
 
-  tensor_mult(const FT& fst, const ST& snd) : fst(fst), snd(snd) {}
+  tensor_op(const FT& fst, const ST& snd) : fst(fst), snd(snd) {}
 
   tensor<T> evaluate() {
     auto fst_val = fst.evaluate();
     auto snd_val = snd.evaluate();
     auto fst_indices = fst.free_indices();
     auto snd_indices = snd.free_indices();
-
     auto indices = all_indices();
     auto all_dims = calc_dimensions(indices);
     size_t total_count = std::accumulate(all_dims.begin(), all_dims.end(), 1,
                                          std::multiplies<double>());
 
     auto dest_indices = free_indices();
-    auto dest_dims = calc_dimensions(dest_indices);
+    if (dest_indices.size() > 0) {
+      auto dest_dims = calc_dimensions(dest_indices);
+      tensor<T> new_tensor(dest_dims);
 
-    // std::cout << "dest_dims: ";
-    // for (auto&& dim : dest_dims) {
-    //   std::cout << dim << ", ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << std::endl;
+      for (size_t i = 0; i < total_count; i++) {
+        std::vector<size_t> dim_index = build_index(i, all_dims);
+        std::vector<size_t> dest_index =
+            swap_indices(indices, dim_index, dest_indices);
+        std::vector<size_t> fst_index =
+            swap_indices(indices, dim_index, fst_indices);
+        std::vector<size_t> snd_index =
+            swap_indices(indices, dim_index, snd_indices);
 
-    tensor<T> new_tensor(dest_dims);
-
-    for (size_t i = 0; i < total_count; i++) {
-      std::vector<size_t> dim_index = build_index(i, all_dims);
-
-      std::vector<size_t> dest_index =
-          swap_indices(indices, dim_index, dest_indices);
-      std::vector<size_t> fst_index =
-          swap_indices(indices, dim_index, fst_indices);
-      std::vector<size_t> snd_index =
-          swap_indices(indices, dim_index, snd_indices);
-
-      // std::cout << "dim_index: ";
-      // for (auto&& dim : dim_index) {
-      //   std::cout << dim << ", ";
-      // }
-      // std::cout << std::endl;
-      // std::cout << "dest_index: ";
-      // for (auto&& dim : dest_index) {
-      //   std::cout << dim << ", ";
-      // }
-      // std::cout << std::endl;
-      // std::cout << "fst_index: ";
-      // for (auto&& dim : fst_index) {
-      //   std::cout << dim << ", ";
-      // }
-      // std::cout << std::endl;
-      // std::cout << "snd_index: ";
-      // for (auto&& dim : snd_index) {
-      //   std::cout << dim << ", ";
-      // }
-      // std::cout << std::endl;
-      // std::cout << new_tensor(dest_index) << "+=" << fst_val(fst_index) << "*"
-      //           << snd_val(snd_index) << std::endl;
-      // std::cout << std::endl;
-
-      new_tensor(dest_index) += fst_val(fst_index) * snd_val(snd_index);
-    }
-
-    return new_tensor;
-  }
-
-  std::vector<size_t> swap_indices(const std::vector<char>& source_chars,
-                                   const std::vector<size_t>& source_indices,
-                                   const std::vector<char>& dest_chars) {
-    std::vector<size_t> dest;
-
-    for (size_t i = 0; i < source_chars.size(); i++) {
-      for (size_t j = 0; j < dest_chars.size(); j++) {
-        if (source_chars.at(i) == dest_chars.at(j)) {
-          dest.push_back(source_indices.at(i));
-        }
+        new_tensor(dest_index) +=
+            OP::apply(fst_val(fst_index), snd_val(snd_index));
       }
-    }
 
-    return dest;
+      return new_tensor;
+    } else {
+      T dest_scalar = 0;
+
+      for (size_t i = 0; i < total_count; i++) {
+        std::vector<size_t> dim_index = build_index(i, all_dims);
+        std::vector<size_t> fst_index =
+            swap_indices(indices, dim_index, fst_indices);
+        std::vector<size_t> snd_index =
+            swap_indices(indices, dim_index, snd_indices);
+
+        dest_scalar += OP::apply(fst_val(fst_index), snd_val(snd_index));
+      }
+
+      tensor<T> new_tensor(1);
+      new_tensor(0) = dest_scalar;
+      return new_tensor;
+    }
   }
 
   std::vector<size_t> calc_dimensions(const std::vector<char>& indices) {
@@ -462,9 +461,18 @@ class tensor_mult {
 
   std::vector<char> all_indices() { return setify(joined_indices()); }
 
-  template <typename ST2>
-  tensor_mult<T, tensor_mult<T, FT, ST>, ST2> operator*(const ST2& other) {
-    return tensor_mult<T, tensor_mult<T, FT, ST>, ST2>(*this, other);
+  template <typename ST2, typename OP2>
+  tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_sum<T>> operator+(
+      const ST2& other) {
+    return tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_sum<T>>(*this,
+                                                                   other);
+  }
+
+  template <typename ST2, typename OP2>
+  tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_mult<T>> operator*(
+      const ST2& other) {
+    return tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_mult<T>>(*this,
+                                                                    other);
   }
 };
 
@@ -476,7 +484,7 @@ class tensor<T, dynamic> {
  public:
   reserved::tensor_constant<T> ein(const char* indices) {
     return reserved::tensor_constant<T>(
-        *this, std::vector<char>(indices, indices + strlen(indices)));
+        *this, std::vector<char>(indices, indices + std::strlen(indices)));
   }
 
   // C-style constructor with explicit rank and pointer to array of dimensions
