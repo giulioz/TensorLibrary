@@ -64,26 +64,26 @@ void test2() {
 void test3() {
   std::cout << "Test3:" << std::endl;
 
-  // tensor::tensor<int> a(3);
-  // fill_tensor_i(a, 0);
-  // auto exp = a.ein("i") * a.ein("i");
-  // tensor::tensor<int> c = exp.evaluate();
-  // printTensor(c);
-  // assertTensorValues(c, "5, \n");
+  tensor::tensor<int> a(3);
+  fill_tensor_i(a, 0);
+  auto exp = a.ein("i") * a.ein("i");
+  tensor::tensor<int> c = exp.evaluate();
+  printTensor(c);
+  assertTensorValues(c, "5, \n");
 
-  // tensor::tensor<int> d(3, 3);
-  // fill_tensor_i(d, 0);
-  // auto exp2 = d.ein("ij") * d.ein("ij");
-  // tensor::tensor<int> e = exp2.evaluate();
-  // printTensor(e);
-  // assertTensorValues(e, "204, \n");
-  
+  tensor::tensor<int> d(3, 3);
+  fill_tensor_i(d, 0);
+  auto exp2 = d.ein("ij") * d.ein("ij");
+  tensor::tensor<int> e = exp2.evaluate();
+  printTensor(e);
+  assertTensorValues(e, "204, \n");
+
   tensor::tensor<int> f(3, 3);
   fill_tensor_i(f, 0);
   auto exp3 = f.ein("ii");
   tensor::tensor<int> g = exp3.evaluate();
   printTensor(g);
-  // assertTensorValues(g, "204, \n");
+  assertTensorValues(g, "36, \n");
 
   std::cout << std::endl;
 }

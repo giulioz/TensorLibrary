@@ -255,19 +255,6 @@ std::vector<char> calc_free_indices(const std::vector<char>& indices) {
   return indicesNew;
 }
 
-std::vector<char> calc_repeated_indices(const std::vector<char>& indices) {
-  auto occ = occurrences(indices);
-
-  std::vector<char> indicesNew;
-  for (auto&& i : occ) {
-    if (i.second >= 2) {
-      indicesNew.push_back(i.first);
-    }
-  }
-
-  return indicesNew;
-}
-
 template <typename CoordsType>
 void calc_strides(const CoordsType& dimensions, std::vector<size_t>& strides) {
   size_t stride = 1;
@@ -339,7 +326,72 @@ class tensor_constant {
   tensor_constant(const tensor<T>& tensorRef, const std::vector<char>& indices)
       : tensorRef(tensorRef), indices(indices) {}
 
-  tensor<T> evaluate() { return tensorRef; }
+  tensor<T> evaluate() {
+    if (free_indices().size() == indices.size()) {
+      return tensorRef;
+    } else {
+      return evaluate_repeated();
+    }
+  }
+
+  tensor<T> evaluate_repeated() {
+    auto all_indices = setify(indices);
+    auto all_dims = calc_dimensions(all_indices);
+    size_t total_count = std::accumulate(all_dims.begin(), all_dims.end(), 1,
+                                         std::multiplies<double>());
+
+    auto dest_indices = free_indices();
+    if (dest_indices.size() > 0) {
+      auto dest_dims = calc_dimensions(dest_indices);
+      tensor<T> new_tensor(dest_dims);
+
+      for (size_t i = 0; i < total_count; i++) {
+        std::vector<size_t> dim_index = build_index(i, all_dims);
+        std::vector<size_t> dest_index =
+            swap_indices(indices, dim_index, dest_indices);
+
+        new_tensor(dest_index) += tensorRef(dim_index);
+      }
+
+      return new_tensor;
+    } else {
+      // if the dimensions are =0, return a scalar instead
+      // (encapsulated in a 1-rank 1-element tensor)
+      T dest_scalar = 0;
+
+      for (size_t i = 0; i < total_count; i++) {
+        std::vector<size_t> dim_index = build_index(i, all_dims);
+
+        for (auto&& i : dim_index) {
+          std::cout << i << ", ";
+        }
+        std::cout << std::endl;
+
+        dest_scalar += tensorRef(dim_index);
+      }
+
+      tensor<T> new_tensor(1);
+      new_tensor(0) = dest_scalar;
+      return new_tensor;
+    }
+  }
+
+  std::vector<size_t> calc_dimensions(const std::vector<char>& indices) {
+    std::vector<size_t> dims;
+
+    for (size_t i = 0; i < indices.size(); i++) {
+      auto dim_fst = index_dimension(indices[i]);
+
+      if (dim_fst > 0) {
+        dims.push_back(dim_fst);
+      } else {
+        // unexpected error!
+        dims.push_back(0);
+      }
+    }
+
+    return dims;
+  }
 
   std::vector<char> free_indices() { return calc_free_indices(indices); }
 
@@ -641,7 +693,7 @@ class tensor<T, dynamic> {
     result.width.insert(result.width.end(), width.begin(),
                         width.begin() + begin);
     result.width.insert(result.width.end(), width.begin() + end, width.end());
-    for (int i = begin; i != end; ++i) result.width[end] *= width[i];
+    for (size_t i = begin; i != end; ++i) result.width[end] *= width[i];
     result.start_prt = start_ptr;
     result.data = data;
     return result;
