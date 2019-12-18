@@ -405,6 +405,8 @@ class tensor_op {
 
       return new_tensor;
     } else {
+      // if the dimensions are =0, return a scalar instead (encapsulated in a
+      // tensor)
       T dest_scalar = 0;
 
       for (size_t i = 0; i < total_count; i++) {
@@ -482,9 +484,9 @@ class tensor_op {
 template <typename T>
 class tensor<T, dynamic> {
  public:
-  reserved::tensor_constant<T> ein(const char* indices) {
+  reserved::tensor_constant<T> ein(const std::string& indices) {
     return reserved::tensor_constant<T>(
-        *this, std::vector<char>(indices, indices + std::strlen(indices)));
+        *this, std::vector<char>(indices.begin(), indices.end()));
   }
 
   // C-style constructor with explicit rank and pointer to array of dimensions
