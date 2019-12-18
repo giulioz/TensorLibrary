@@ -1,4 +1,3 @@
-#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -31,13 +30,15 @@ void assertTensorValues(const TensorType &tensor, std::string expected) {
 void test1() {
   std::cout << "Test1:" << std::endl;
 
-  tensor::tensor<int> a(4, 4, 4);
+  tensor::tensor<int> a({4, 3, 4});
   fill_tensor_i(a, 0);
-  tensor::tensor<int> b(4);
-  fill_tensor_i(b, 100);
+  tensor::tensor<int> b({4});
+  fill_tensor_i(b, 0);
   auto exp = a.ein<'i', 'j', 'k'>() * b.ein<'j'>();
   tensor::tensor<int> c = exp.evaluate();
   printTensor(c);
+  assertTensorValues(c, "20, 23, 26, 29, 56, 59, 62, 65, 92, 95, 98, 101, 128, "
+                        "131, 134, 137, \n");
 
   std::cout << std::endl;
 }
@@ -45,13 +46,14 @@ void test1() {
 void test2() {
   std::cout << "Test2:" << std::endl;
 
-  tensor::tensor<int> a(4);
+  tensor::tensor<int> a({4});
   fill_tensor_i(a, 0);
-  tensor::tensor<int> b(4);
-  fill_tensor_i(b, 100);
+  tensor::tensor<int> b({4});
+  fill_tensor_i(b, 0);
   auto exp = a.ein<'i'>() * b.ein<'i'>();
   tensor::tensor<int> c = exp.evaluate();
   printTensor(c);
+  assertTensorValues(c, "14, \n");
 
   std::cout << std::endl;
 }
@@ -59,7 +61,7 @@ void test2() {
 void test3() {
   std::cout << "Test3:" << std::endl;
 
-  tensor::tensor<int> a(6);
+  tensor::tensor<int> a({6});
   fill_tensor_i(a, 0);
   auto exp = a.ein<'i'>() * a.ein<'i'>();
   tensor::tensor<int> c = exp.evaluate();
@@ -71,7 +73,7 @@ void test3() {
 void test4() {
   std::cout << "Test4:" << std::endl;
 
-  tensor::tensor<int> a(6);
+  tensor::tensor<int> a({6, 6});
   fill_tensor_i(a, 0);
   auto exp = a.ein<'i', 'i'>();
   tensor::tensor<int> c = exp.evaluate();

@@ -4,8 +4,7 @@ project(tensor-library)
 set(CMAKE_CXX_STANDARD 17)
 
 add_compile_options(
-  "-Wall" "-Wpedantic" "-Wextra" "-fexceptions"
-  "$<$<CONFIG:DEBUG>:-O0;-g3;-ggdb>"
+  "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-g3"
 )
 
 add_executable(tensor-library main.cc)
