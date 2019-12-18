@@ -228,6 +228,7 @@ class index_iterator {
   T* ptr;
 };
 
+// Build occurrences vector
 std::map<char, int> occurrences(const std::vector<char>& chars) {
   std::map<char, int> occurrences;
   for (auto&& c : chars) {
@@ -242,6 +243,7 @@ std::map<char, int> occurrences(const std::vector<char>& chars) {
   return occurrences;
 }
 
+// Get single-occurrences in an array
 std::vector<char> calc_free_indices(const std::vector<char>& indices) {
   auto occ = occurrences(indices);
 
@@ -255,17 +257,7 @@ std::vector<char> calc_free_indices(const std::vector<char>& indices) {
   return indicesNew;
 }
 
-template <typename CoordsType>
-void calc_strides(const CoordsType& dimensions, std::vector<size_t>& strides) {
-  size_t stride = 1;
-  size_t i = 0;
-  for (auto&& dim : dimensions) {
-    strides.push_back(stride);
-    stride *= dim;
-    ++i;
-  }
-}
-
+// Remove duplicates in an array
 std::vector<char> setify(const std::vector<char>& indices) {
   auto occ = occurrences(indices);
 
@@ -277,9 +269,24 @@ std::vector<char> setify(const std::vector<char>& indices) {
   return indicesNew;
 }
 
-std::vector<size_t> build_index(size_t i, std::vector<size_t> width) {
-  std::vector<size_t> stride;
-  calc_strides(width, stride);
+// Calculate strides given widths
+std::vector<size_t> calc_strides(const std::vector<size_t>& dimensions) {
+  std::vector<size_t> strides;
+  size_t stride = 1;
+  size_t i = 0;
+
+  for (auto&& dim : dimensions) {
+    strides.push_back(stride);
+    stride *= dim;
+    ++i;
+  }
+
+  return strides;
+}
+
+// Calculate multi-dimension index given a linear index and widths
+std::vector<size_t> build_index(size_t i, const std::vector<size_t>& width) {
+  std::vector<size_t> stride = calc_strides(width);
   std::vector<size_t> result;
 
   for (size_t k = 0; k < stride.size(); k++) {
@@ -289,6 +296,7 @@ std::vector<size_t> build_index(size_t i, std::vector<size_t> width) {
   return result;
 }
 
+// Construct a new multi-dimension index from index letters
 std::vector<size_t> swap_indices(const std::vector<char>& source_chars,
                                  const std::vector<size_t>& source_indices,
                                  const std::vector<char>& dest_chars) {
@@ -310,7 +318,7 @@ class tensor_op;
 
 template <typename T>
 struct op_sum {
-  static T apply(T a, T b) { return a * b; }
+  static T apply(T a, T b) { return a + b; }
 };
 template <typename T>
 struct op_mult {
@@ -361,13 +369,10 @@ class tensor_constant {
 
       for (size_t i = 0; i < total_count; i++) {
         std::vector<size_t> dim_index = build_index(i, all_dims);
+        std::vector<size_t> tensor_index =
+            swap_indices(all_indices, dim_index, indices);
 
-        for (auto&& i : dim_index) {
-          std::cout << i << ", ";
-        }
-        std::cout << std::endl;
-
-        dest_scalar += tensorRef(dim_index);
+        dest_scalar += tensorRef(tensor_index);
       }
 
       tensor<T> new_tensor(1);
@@ -380,7 +385,7 @@ class tensor_constant {
     std::vector<size_t> dims;
 
     for (size_t i = 0; i < indices.size(); i++) {
-      auto dim_fst = index_dimension(indices[i]);
+      auto dim_fst = index_dimension(indices.at(i));
 
       if (dim_fst > 0) {
         dims.push_back(dim_fst);
@@ -404,7 +409,8 @@ class tensor_constant {
     if (i < indices.size()) {
       return tensorRef.width[i];
     } else {
-      return -1;
+      // unexpected error!
+      return 0;
     }
   }
 
@@ -438,8 +444,22 @@ class tensor_op {
                                          std::multiplies<double>());
 
     auto dest_indices = free_indices();
+
     if (dest_indices.size() > 0) {
       auto dest_dims = calc_dimensions(dest_indices);
+
+      // std::cout << "INDICES: ";
+      // for (auto&& i : dest_indices) {
+      //   std::cout << i << ", ";
+      // }
+      // std::cout << std::endl;
+
+      // std::cout << "DIMS: ";
+      // for (auto&& i : dest_dims) {
+      //   std::cout << i << ", ";
+      // }
+      // std::cout << std::endl;
+
       tensor<T> new_tensor(dest_dims);
 
       for (size_t i = 0; i < total_count; i++) {
@@ -481,8 +501,8 @@ class tensor_op {
     std::vector<size_t> dims;
 
     for (size_t i = 0; i < indices.size(); i++) {
-      auto dim_fst = fst.index_dimension(indices[i]);
-      auto dim_snd = snd.index_dimension(indices[i]);
+      auto dim_fst = fst.index_dimension(indices.at(i));
+      auto dim_snd = snd.index_dimension(indices.at(i));
 
       if (dim_fst > 0) {
         dims.push_back(dim_fst);
@@ -515,18 +535,38 @@ class tensor_op {
 
   std::vector<char> all_indices() { return setify(joined_indices()); }
 
-  template <typename ST2, typename OP2>
-  tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_sum<T>> operator+(
-      const ST2& other) {
-    return tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_sum<T>>(*this,
-                                                                   other);
+  size_t index_dimension(char index) {
+    auto dest_indices = free_indices();
+    if (dest_indices.size() > 0) {
+      auto dest_dims = calc_dimensions(dest_indices);
+
+      size_t i = 0;
+      while (i < dest_indices.size() && dest_indices.at(i) != index) {
+        i++;
+      }
+
+      if (i < dest_indices.size()) {
+        return dest_dims[i];
+      } else {
+        // unexpected error!
+        return 0;
+      }
+    } else {
+      return 1;
+    }
   }
 
-  template <typename ST2, typename OP2>
-  tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_mult<T>> operator*(
+  template <typename ST2>
+  tensor_op<T, tensor_op<T, FT, ST, OP>, ST2, op_sum<T>> operator+(
       const ST2& other) {
-    return tensor_op<T, tensor_op<T, FT, ST, OP2>, ST2, op_mult<T>>(*this,
-                                                                    other);
+    return tensor_op<T, tensor_op<T, FT, ST, OP>, ST2, op_sum<T>>(*this, other);
+  }
+
+  template <typename ST2>
+  tensor_op<T, tensor_op<T, FT, ST, OP>, ST2, op_mult<T>> operator*(
+      const ST2& other) {
+    return tensor_op<T, tensor_op<T, FT, ST, OP>, ST2, op_mult<T>>(*this,
+                                                                   other);
   }
 };
 
