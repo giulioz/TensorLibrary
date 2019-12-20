@@ -244,7 +244,7 @@ std::map<char, int> occurrences(const std::vector<char>& chars) {
 }
 
 // Get single-occurrences in an array
-std::vector<char> calc_free_indices(const std::vector<char>& indices) {
+std::vector<char> single_occurrences(const std::vector<char>& indices) {
   auto occ = occurrences(indices);
 
   std::vector<char> indicesNew;
@@ -319,10 +319,16 @@ class tensor_op;
 template <typename T>
 struct op_sum {
   static T apply(T a, T b) { return a + b; }
+  static std::vector<char> free_indices(const std::vector<char>& indices) {
+    return setify(indices);
+  }
 };
 template <typename T>
 struct op_mult {
   static T apply(T a, T b) { return a * b; }
+  static std::vector<char> free_indices(const std::vector<char>& indices) {
+    return single_occurrences(indices);
+  }
 };
 
 template <typename T>
@@ -398,7 +404,7 @@ class tensor_constant {
     return dims;
   }
 
-  std::vector<char> free_indices() { return calc_free_indices(indices); }
+  std::vector<char> free_indices() { return single_occurrences(indices); }
 
   size_t index_dimension(char index) {
     size_t i = 0;
@@ -530,7 +536,7 @@ class tensor_op {
   }
 
   std::vector<char> free_indices() {
-    return calc_free_indices(joined_indices());
+    return OP::free_indices(joined_indices());
   }
 
   std::vector<char> all_indices() { return setify(joined_indices()); }

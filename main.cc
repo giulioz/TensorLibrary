@@ -60,8 +60,6 @@ void tensorMultiplicationTests() {
   fill_tensor_i(a2, 0);
   tensor::tensor<int> b2(4, 4);
   fill_tensor_i(b2, 0);
-  tensor::tensor<int> c2(4);
-  fill_tensor_i(c2, 0);
   auto exp3 = a2.ein("ij") * b2.ein("ik");
   tensor::tensor<int> d2 = exp3.evaluate();
   printTensor(d2);
@@ -113,11 +111,11 @@ void tensorAdditionTests() {
   tensor::tensor<int> a(4);
   fill_tensor_i(a, 0);
   tensor::tensor<int> b(4);
-  fill_tensor_i(b, 0);
+  fill_tensor_i(b, 2);
   auto exp = a.ein("i") + b.ein("i");
   tensor::tensor<int> c = exp.evaluate();
   printTensor(c);
-  assertTensorValues(c, "12, \n");
+  assertTensorValues(c, "2, 4, 6, 8, \n");
 
   tensor::tensor<int> a1(2, 2, 2);
   fill_tensor_i(a1, 0);
@@ -126,7 +124,14 @@ void tensorAdditionTests() {
   auto exp1 = a1.ein("ijk") + b1.ein("ijk");
   tensor::tensor<int> c1 = exp1.evaluate();
   printTensor(c1);
-  assertTensorValues(c1, "56, \n");
+  assertTensorValues(c1, "0, 2, 4, 6, 8, 10, 12, 14, \n");
+
+  tensor::tensor<int> a2(3, 3);
+  fill_tensor_i(a2, 0);
+  auto exp2 = a2.ein("ij") + a2.ein("ji");
+  tensor::tensor<int> c2 = exp2.evaluate();
+  printTensor(c2);
+  // assertTensorValues(c2, "2, 4, 6, 8, \n");
 
   std::cout << std::endl;
 }
@@ -172,7 +177,7 @@ int main() {
   sameTensorMultiplicationTests();
   traceTests();
   tensorAdditionTests();
-  // operationConcatTests();
+  operationConcatTests();
 
   return 0;
 }
