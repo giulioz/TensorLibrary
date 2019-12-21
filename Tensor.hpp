@@ -35,11 +35,17 @@ namespace expressions {
 
 template <char...> struct vars;
 
-template <typename, typename = void> struct free_vars;
-
-template <typename, typename = void> struct repeated_vars;
-
 template <typename, typename> struct concat_vars;
+
+template <typename, typename = void> struct single_vars;
+
+template <typename, typename = void> struct double_vars;
+
+template <typename, typename = void> struct at_most_2_equals_vars;
+
+template <typename, typename, typename = void> struct match_vars;
+
+template <char, typename> struct count_var;
 
 template <char, typename> struct find_var;
 
@@ -59,43 +65,94 @@ template <> struct vars<> {
 
 constexpr char vars<>::id[1];
 
-template <> struct free_vars<vars<>> { using value = vars<>; };
+template <> struct single_vars<vars<>> { using value = vars<>; };
 
-template <char H, char... Ts>
-struct free_vars<vars<H, Ts...>, typename std::enable_if<
-                                     find_var<H, vars<Ts...>>::value>::type> {
-  using value =
-      typename free_vars<typename remove_var<H, vars<Ts...>>::value>::value;
+template <char... As, char... Bs> struct concat_vars<vars<As...>, vars<Bs...>> {
+  using value = vars<As..., Bs...>;
 };
 
 template <char H, char... Ts>
-struct free_vars<vars<H, Ts...>, typename std::enable_if<
-                                     !find_var<H, vars<Ts...>>::value>::type> {
+struct single_vars<vars<H, Ts...>, typename std::enable_if<
+                                       find_var<H, vars<Ts...>>::value>::type> {
+  using value =
+      typename single_vars<typename remove_var<H, vars<Ts...>>::value>::value;
+};
+
+template <char H, char... Ts>
+struct single_vars<
+    vars<H, Ts...>,
+    typename std::enable_if<!find_var<H, vars<Ts...>>::value>::type> {
   using value =
       typename concat_vars<vars<H>,
-                           typename free_vars<vars<Ts...>>::value>::value;
+                           typename single_vars<vars<Ts...>>::value>::value;
 };
 
-template <> struct repeated_vars<vars<>> { using value = vars<>; };
+template <> struct double_vars<vars<>> { using value = vars<>; };
 
 template <char H, char... Ts>
-struct repeated_vars<
-    vars<H, Ts...>,
-    typename std::enable_if<find_var<H, vars<Ts...>>::value>::type> {
+struct double_vars<vars<H, Ts...>, typename std::enable_if<
+                                       find_var<H, vars<Ts...>>::value>::type> {
   using value =
-      typename concat_vars<vars<H>, typename repeated_vars<typename remove_var<
+      typename concat_vars<vars<H>, typename double_vars<typename remove_var<
                                         H, vars<Ts...>>::value>::value>::value;
 };
 
 template <char H, char... Ts>
-struct repeated_vars<
+struct double_vars<
     vars<H, Ts...>,
     typename std::enable_if<!find_var<H, vars<Ts...>>::value>::type> {
-  using value = typename repeated_vars<vars<Ts...>>::value;
+  using value = typename double_vars<vars<Ts...>>::value;
 };
 
-template <char... As, char... Bs> struct concat_vars<vars<As...>, vars<Bs...>> {
-  using value = vars<As..., Bs...>;
+template <> struct at_most_2_equals_vars<vars<>> {
+  constexpr static bool value = true;
+};
+
+template <char H, char... Ts>
+struct at_most_2_equals_vars<
+    vars<H, Ts...>,
+    typename std::enable_if<(1 + count_var<H, vars<Ts...>>::value > 2)>::type> {
+  constexpr static bool value = false;
+};
+
+template <char H, char... Ts>
+struct at_most_2_equals_vars<
+    vars<H, Ts...>, typename std::enable_if<(
+                        1 + count_var<H, vars<Ts...>>::value <= 2)>::type> {
+  constexpr static bool value =
+      at_most_2_equals_vars<typename remove_var<H, vars<Ts...>>::value>::value;
+};
+
+template <> struct match_vars<vars<>, vars<>> {
+  constexpr static bool value = true;
+};
+
+template <char... As, char... Bs>
+struct match_vars<
+    vars<As...>, vars<Bs...>,
+    typename std::enable_if<sizeof...(As) != sizeof...(Bs)>::type> {
+  constexpr static bool value = false;
+};
+
+template <char A, char... As, char... Bs>
+struct match_vars<
+    vars<A, As...>, vars<Bs...>,
+    typename std::enable_if<1 + sizeof...(As) == sizeof...(Bs)>::type> {
+  constexpr static bool value =
+      match_vars<typename remove_var<A, vars<As...>>::value,
+                 typename remove_var<A, vars<Bs...>>::value>::value;
+};
+
+template <char I> struct count_var<I, vars<>> {
+  constexpr static size_t value = 0;
+};
+
+template <char I, char... Ts> struct count_var<I, vars<I, Ts...>> {
+  constexpr static size_t value = 1 + count_var<I, vars<Ts...>>::value;
+};
+
+template <char I, char H, char... Ts> struct count_var<I, vars<H, Ts...>> {
+  constexpr static size_t value = count_var<I, vars<Ts...>>::value;
 };
 
 template <char I> struct find_var<I, vars<>> {
@@ -132,40 +189,73 @@ template <typename, typename, typename> class tensor_addition;
 
 template <typename, typename, typename> class tensor_multiplication;
 
-template <typename> struct expression_multi_vars;
+template <typename> struct term_multi_vars;
 
 template <typename T, char... Is>
-struct expression_multi_vars<tensor_constant<T, vars<Is...>>> {
+struct term_multi_vars<tensor_constant<T, vars<Is...>>> {
   using value = vars<Is...>;
 };
 
 template <typename T, typename A, typename B>
-struct expression_multi_vars<tensor_addition<T, A, B>> {
-  using value =
-      typename concat_vars<typename expression_multi_vars<A>::value,
-                           typename expression_multi_vars<B>::value>::value;
+struct term_multi_vars<tensor_addition<T, A, B>> {
+  using value = typename single_vars<typename term_multi_vars<A>::value>::value;
 };
 
 /*
 template <typename T, typename A>
-struct expression_multi_vars<tensor_negation<T, A>> {
-    using value = typename expression_multi_vars<A>::value;
+struct term_multi_vars<tensor_negation<T, A>> {
+    using value = typename term_multi_vars<A>::value;
 }; */
 
 template <typename T, typename A, typename B>
-struct expression_multi_vars<tensor_multiplication<T, A, B>> {
-  using value =
-      typename concat_vars<typename expression_multi_vars<A>::value,
-                           typename expression_multi_vars<B>::value>::value;
+struct term_multi_vars<tensor_multiplication<T, A, B>> {
+  using value = typename concat_vars<typename term_multi_vars<A>::value,
+                                     typename term_multi_vars<B>::value>::value;
+};
+
+template <typename> struct validate_expression;
+
+template <typename T, char... Is>
+struct validate_expression<tensor_constant<T, vars<Is...>>> {
+  constexpr static bool value = at_most_2_equals_vars<vars<Is...>>::value;
+};
+
+template <typename T, typename A, typename B>
+struct validate_expression<tensor_addition<T, A, B>> {
+  constexpr static bool value =
+      validate_expression<A>::value && validate_expression<B>::value &&
+      match_vars<
+          typename single_vars<typename term_multi_vars<A>::value>::value,
+          typename single_vars<typename term_multi_vars<B>::value>::value>::
+          value;
+};
+
+/*
+template <typename T, typename A>
+struct validate_expression<tensor_negation<T, A>> {
+  constexpr static bool value = validate_expression<A>::value;
+};
+*/
+
+template <typename T, typename A, typename B>
+struct validate_expression<tensor_multiplication<T, A, B>> {
+  constexpr static bool value =
+      validate_expression<A>::value && validate_expression<B>::value &&
+      at_most_2_equals_vars<typename term_multi_vars<
+          tensor_multiplication<T, A, B>>::value>::value;
 };
 
 template <typename T, typename Derived> class tensor_expression {
 public:
-  using my_free_vars =
-      typename free_vars<typename expression_multi_vars<Derived>::value>::value;
-  using my_repeated_vars = typename repeated_vars<
-      typename expression_multi_vars<Derived>::value>::value;
-  constexpr static size_t result_rank = my_free_vars::size;
+  using free_vars =
+      typename single_vars<typename term_multi_vars<Derived>::value>::value;
+  using repeated_vars =
+      typename double_vars<typename term_multi_vars<Derived>::value>::value;
+  constexpr static size_t result_rank = free_vars::size;
+
+  tensor_expression() {
+    static_assert(validate_expression<Derived>::value, "Invalid expression");
+  }
 
   template <typename Derived1>
   tensor_addition<T, Derived, Derived1>
@@ -183,118 +273,122 @@ public:
     return tensor_multiplication<T, Derived, Derived1>(*this, other);
   }
 
-  template <size_t _result_rank = result_rank>
-  typename std::enable_if<(_result_rank >= 2),
-                          tensor<T, rank<result_rank>>>::type
-  evaluate() const {
-    std::vector<size_t> free_vars_dims;
-    size_t free_vars_size = 1;
-    for (size_t i = 0; i < my_free_vars::size; i++) {
-      size_t d = get_dimension(my_free_vars::id[i]);
-      free_vars_dims.push_back(d);
-      free_vars_size *= d;
+  template <char... Is, size_t __result_rank = result_rank,
+            typename std::enable_if<(__result_rank >= 2), bool>::type = true>
+  tensor<T, rank<result_rank>> evaluate() const {
+    using result_vars = vars<Is...>;
+    static_assert(
+        match_vars<result_vars, free_vars>::value,
+        "The free variables on both the sides of an equation must match");
+
+    std::vector<size_t> dims;
+    for (size_t i = 0; i < result_vars::size; i++) {
+      dims.push_back(get_dimension(result_vars::id[i]));
     }
+    tensor<T, rank<result_rank>> result(dims);
 
-    std::vector<size_t> repeated_vars_dims;
-    size_t repeated_vars_size = 1;
-    for (size_t i = 0; i < my_repeated_vars::size; i++) {
-      size_t d = get_dimension(my_repeated_vars::id[i]);
-      repeated_vars_dims.push_back(d);
-      repeated_vars_size *= d;
+    size_t free_vars_values_count =
+        count_vars_values(result_vars::id, result_vars::size);
+    for (size_t i = 0; i < free_vars_values_count; i++) {
+      auto free_vars_values =
+          get_nth_vars_values(i, result_vars::id, result_vars::size);
+      result(to_indexes(result_vars::id, result_vars::size, free_vars_values)) =
+          evaluate_summation(free_vars_values);
     }
-
-    tensor<T, rank<result_rank>> result(free_vars_dims);
-
-    for (size_t i = 0; i < free_vars_size; i++) {
-      auto free_vars_values = get_nth_vars_values(i, free_vars_dims);
-      T part = evaluate_part(bind_vars_values(
-          free_vars_values, get_nth_vars_values(0, repeated_vars_dims)));
-      for (size_t j = 1; j < repeated_vars_size; j++) {
-        part += evaluate_part(bind_vars_values(
-            free_vars_values, get_nth_vars_values(j, repeated_vars_dims)));
-      }
-      result(free_vars_values) = part;
-    }
-
     return result;
   }
 
-  template <size_t _result_rank = result_rank>
-  typename std::enable_if<(_result_rank < 2), tensor<T, rank<1>>>::type
-  evaluate() const {
-    std::vector<size_t> free_vars_dims;
-    size_t free_vars_size = 1;
-    for (size_t i = 0; i < my_free_vars::size; i++) {
-      size_t d = get_dimension(my_free_vars::id[i]);
-      free_vars_dims.push_back(d);
-      free_vars_size *= d;
+  template <char... Is, size_t __result_rank = result_rank,
+            typename std::enable_if<(__result_rank < 2), bool>::type = true>
+  tensor<T, rank<1>> evaluate() const {
+    using result_vars = vars<Is...>;
+    static_assert(
+        match_vars<result_vars, free_vars>::value,
+        "The free variables on both the sides of an equation must match");
+
+    size_t d = result_rank > 0 ? get_dimension(result_vars::id[0]) : 1;
+    tensor<T, rank<1>> result(d);
+
+    size_t free_vars_values_count =
+        count_vars_values(result_vars::id, result_vars::size);
+    for (size_t i = 0; i < free_vars_values_count; i++) {
+      auto free_vars_values =
+          get_nth_vars_values(i, result_vars::id, result_vars::size);
+      result(to_indexes(result_vars::id, result_vars::size, free_vars_values)) =
+          evaluate_summation(free_vars_values);
     }
-
-    std::vector<size_t> repeated_vars_dims;
-    size_t repeated_vars_size = 1;
-    for (size_t i = 0; i < my_repeated_vars::size; i++) {
-      size_t d = get_dimension(my_repeated_vars::id[i]);
-      repeated_vars_dims.push_back(d);
-      repeated_vars_size *= d;
-    }
-
-    tensor<T, rank<1>> result(
-        result_rank > 0 ? get_dimension(my_free_vars::id[0]) : 1);
-
-    for (size_t i = 0; i < free_vars_size; i++) {
-      auto free_vars_values = get_nth_vars_values(i, free_vars_dims);
-      T part = evaluate_part(bind_vars_values(
-          free_vars_values, get_nth_vars_values(0, repeated_vars_dims)));
-      for (size_t j = 1; j < repeated_vars_size; j++) {
-        part += evaluate_part(bind_vars_values(
-            free_vars_values, get_nth_vars_values(j, repeated_vars_dims)));
-      }
-
-      if (result_rank == 0) {
-        free_vars_values.push_back(0);
-      }
-
-      result(free_vars_values) = part;
-    }
-
     return result;
   }
 
-  // protected:
-  T evaluate_part(const std::map<char, size_t> &vars_values) const {
-    return static_cast<const Derived *>(this)->evaluate_part(vars_values);
+protected:
+  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+    return static_cast<const Derived *>(this)->evaluate_direct(vars_values);
+  }
+
+  T evaluate_summation(const std::map<char, size_t> &vars_values) const {
+    T result = evaluate_direct(bind_vars_values(
+        vars_values,
+        get_nth_vars_values(0, repeated_vars::id, repeated_vars::size)));
+
+    size_t vars_values1_count =
+        count_vars_values(repeated_vars::id, repeated_vars::size);
+    for (size_t i = 1; i < vars_values1_count; i++) {
+      result += evaluate_direct(bind_vars_values(
+          vars_values,
+          get_nth_vars_values(i, repeated_vars::id, repeated_vars::size)));
+    }
+
+    return result;
   }
 
   size_t get_dimension(char v) const {
     return static_cast<const Derived *>(this)->get_dimension(v);
   }
 
+  const std::map<char, size_t> &get_dimensions() const {
+    return static_cast<const Derived *>(this)->get_dimensions();
+  }
+
 private:
-  std::vector<size_t>
-  get_nth_vars_values(size_t n, const std::vector<size_t> &dims) const {
-    std::vector<size_t> result;
-
-    for (auto i = dims.rbegin(); i != dims.rend(); ++i) {
-      result.insert(result.begin(), n % *i);
-      n /= *i;
+  size_t count_vars_values(const char id[], const size_t size) const {
+    size_t result = 1;
+    for (size_t i = 0; i < size; ++i) {
+      result *= get_dimension(id[i]);
     }
+    return result;
+  }
 
+  std::map<char, size_t> get_nth_vars_values(size_t n, const char id[],
+                                             const size_t size) const {
+    std::map<char, size_t> result;
+    for (size_t i = size; i-- > 0;) {
+      size_t d = get_dimension(id[i]);
+      result[id[i]] = n % d;
+      n /= d;
+    }
     return result;
   }
 
   std::map<char, size_t>
-  bind_vars_values(const std::vector<size_t> &free_vars_values,
-                   const std::vector<size_t> &repeated_vars_values) const {
-    std::map<char, size_t> result;
-
-    for (size_t i = 0; i < my_free_vars::size; i++) {
-      result[my_free_vars::id[i]] = free_vars_values[i];
+  bind_vars_values(std::map<char, size_t> orig,
+                   const std::map<char, size_t> &edit) const {
+    for (auto &i : edit) {
+      orig[i.first] = i.second;
     }
+    return orig;
+  }
 
-    for (size_t i = 0; i < my_repeated_vars::size; i++) {
-      result[my_repeated_vars::id[i]] = repeated_vars_values[i];
+  std::vector<size_t>
+  to_indexes(const char id[], const size_t size,
+             const std::map<char, size_t> &vars_values) const {
+    std::vector<size_t> result;
+    if (size > 0) {
+      for (size_t i = 0; i < size; i++) {
+        result.push_back(vars_values.at(id[i]));
+      }
+    } else {
+      result.push_back(0);
     }
-
     return result;
   }
 };
@@ -302,62 +396,117 @@ private:
 template <typename T, char... Is>
 class tensor_constant<T, vars<Is...>>
     : public tensor_expression<T, tensor_constant<T, vars<Is...>>> {
-  template <typename, class> friend class tensor;
-
 public:
-  tensor_constant(const tensor<T> &tensor_copy) : tensor_copy(tensor_copy) {}
+  tensor_constant(const tensor<T> &my_tensor) : my_tensor(my_tensor) {
+    assert(my_tensor.get_rank() == sizeof...(Is));
+    assert(init_dimensions());
+  }
 
   template <size_t N>
-  tensor_constant(
-      const tensor<T, rank<N>> &tensor_copy,
-      typename std::enable_if<N == sizeof...(Is), bool>::type = true)
-      : tensor_copy(tensor_copy) {}
+  tensor_constant(const tensor<T, rank<N>> &my_tensor) : my_tensor(my_tensor) {
+    static_assert(N == sizeof...(Is),
+                  "The number of variables must be equals to the tensor rank");
+    assert(init_dimensions());
+  }
 
-  // protected:
-  T evaluate_part(const std::map<char, size_t> &vars_values) const {
+  template <typename, typename> friend class tensor_expression;
+  template <typename, typename> friend class tensor_constant;
+  template <typename, typename, typename> friend class tensor_addition;
+  // template <typename, typename> friend class tensor_negation; // TODO: enable
+  // this
+  template <typename, typename, typename> friend class tensor_multiplication;
+
+protected:
+  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     std::vector<size_t> indexes;
     for (size_t i = 0; i < vars<Is...>::size; i++) {
       indexes.push_back(vars_values.at(vars<Is...>::id[i]));
     }
-    return tensor_copy(indexes);
+    return my_tensor(indexes);
   }
 
-  size_t get_dimension(char v) const {
-    for (size_t i = 0; i < vars<Is...>::size; i++) {
-      if (v == vars<Is...>::id[i]) {
-        return tensor_copy.width[i];
-      }
-    }
-    return -1;
-  }
+  size_t get_dimension(char v) const { return dimensions.at(v); }
+
+  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
 
 private:
-  const tensor<T> tensor_copy;
+  const tensor<T> my_tensor;
+
+  bool init_dimensions() {
+    for (size_t i = 0; i < vars<Is...>::size; i++) {
+      size_t id = vars<Is...>::id[i];
+      if (dimensions.count(id) > 0) {
+        if (dimensions[id] != my_tensor.get_width(i)) {
+          return false;
+        }
+      } else {
+        dimensions[id] = my_tensor.get_width(i);
+      }
+    }
+    return true;
+  }
+
+  std::map<char, size_t> dimensions;
 };
 
 template <typename T, typename A, typename B>
 class tensor_addition : public tensor_expression<T, tensor_addition<T, A, B>> {
 public:
+  using free_vars = typename term_multi_vars<tensor_addition<T, A, B>>::value;
+  using repeated_vars = vars<>;
+
   tensor_addition(const tensor_expression<T, A> &a,
                   const tensor_expression<T, B> &b)
-      : a(static_cast<const A &>(a)), b(static_cast<const B &>(b)) {}
-
-  // protected:
-  T evaluate_part(const std::map<char, size_t> &vars_values) const {
-    return a.evaluate_part(vars_values) + b.evaluate_part(vars_values);
+      : a(static_cast<const A &>(a)), b(static_cast<const B &>(b)) {
+    assert(init_dimensions());
   }
 
-  size_t get_dimension(char v) const {
-    size_t result = a.get_dimension(v);
-    if (result < 0) {
-      result = b.get_dimension(v);
-    }
-    return result;
+  template <typename, typename> friend class tensor_expression;
+  template <typename, typename> friend class tensor_constant;
+  template <typename, typename, typename> friend class tensor_addition;
+  // template <typename, typename> friend class tensor_negation; // TODO: enable
+  // this
+  template <typename, typename, typename> friend class tensor_multiplication;
+
+protected:
+  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+    return a.evaluate_summation(vars_values) +
+           b.evaluate_summation(vars_values);
   }
+
+  size_t get_dimension(char v) const { return dimensions.at(v); }
+
+  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
 
 private:
   const A a;
   const B b;
+
+  bool init_dimensions() {
+    std::map<char, size_t> &dimensions_a = a.get_dimensions();
+    std::map<char, size_t> &dimensions_b = b.get_dimensions();
+    for (auto &i : dimensions_a) {
+      if (dimensions.count(i.first) > 0) {
+        if (dimensions[i.first] != i.second) {
+          return false;
+        }
+      } else {
+        dimensions[i.first] = i.second;
+      }
+    }
+    for (auto &i : dimensions_b) {
+      if (dimensions.count(i.first) > 0) {
+        if (dimensions[i.first] != i.second) {
+          return false;
+        }
+      } else {
+        dimensions[i.first] = i.second;
+      }
+    }
+    return true;
+  }
+
+  std::map<char, size_t> dimensions;
 };
 
 // template <typename, typename> class tensor_negation; // TODO
@@ -368,24 +517,55 @@ class tensor_multiplication
 public:
   tensor_multiplication(const tensor_expression<T, A> &a,
                         const tensor_expression<T, B> &b)
-      : a(static_cast<const A &>(a)), b(static_cast<const B &>(b)) {}
-
-  // protected:
-  T evaluate_part(const std::map<char, size_t> &vars_values) const {
-    return a.evaluate_part(vars_values) * b.evaluate_part(vars_values);
+      : a(static_cast<const A &>(a)), b(static_cast<const B &>(b)) {
+    assert(init_dimensions());
   }
 
-  size_t get_dimension(char v) const {
-    size_t result = a.get_dimension(v);
-    if (result < 0) {
-      result = b.get_dimension(v);
-    }
-    return result;
+  template <typename, typename> friend class tensor_expression;
+  template <typename, typename> friend class tensor_constant;
+  template <typename, typename, typename> friend class tensor_addition;
+  // template <typename, typename> friend class tensor_negation; // TODO: enable
+  // this
+  template <typename, typename, typename> friend class tensor_multiplication;
+
+protected:
+  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+    return a.evaluate_direct(vars_values) * b.evaluate_direct(vars_values);
   }
+
+  size_t get_dimension(char v) const { return dimensions.at(v); }
+
+  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
 
 private:
   const A a;
   const B b;
+
+  bool init_dimensions() {
+    std::map<char, size_t> &dimensions_a = a.get_dimensions();
+    std::map<char, size_t> &dimensions_b = b.get_dimensions();
+    for (auto &i : dimensions_a) {
+      if (dimensions.count(i.first) > 0) {
+        if (dimensions[i.first] != i.second) {
+          return false;
+        }
+      } else {
+        dimensions[i.first] = i.second;
+      }
+    }
+    for (auto &i : dimensions_b) {
+      if (dimensions.count(i.first) > 0) {
+        if (dimensions[i.first] != i.second) {
+          return false;
+        }
+      } else {
+        dimensions[i.first] = i.second;
+      }
+    }
+    return true;
+  }
+
+  std::map<char, size_t> dimensions;
 };
 
 } // namespace expressions
@@ -603,15 +783,15 @@ public:
       : tensor(dimensions.size(), &*dimensions.begin()) {}
 
   template <size_t rank> tensor(const size_t dims[rank]) : tensor(rank, dims) {}
-  // template <typename... Dims>
-  // tensor(Dims... dims)
-  //     : width({static_cast<const size_t>(dims)...}),
-  //       stride(sizeof...(dims), 1UL) {
-  //   for (size_t i = width.size() - 1UL; i != 0UL; --i)
-  //     stride[i - 1] = stride[i] * width[i];
-  //   data = std::make_shared<std::vector<T>>(stride[0] * width[0]);
-  //   start_ptr = &(data->operator[](0));
-  // }
+  template <typename... Dims>
+  tensor(Dims... dims)
+      : width({static_cast<const size_t>(dims)...}),
+        stride(sizeof...(dims), 1UL) {
+    for (size_t i = width.size() - 1UL; i != 0UL; --i)
+      stride[i - 1] = stride[i] * width[i];
+    data = std::make_shared<std::vector<T>>(stride[0] * width[0]);
+    start_ptr = &(data->operator[](0));
+  }
 
   tensor(const tensor<T, dynamic> &X) = default;
   tensor(tensor<T, dynamic> &&X) = default;
@@ -630,6 +810,8 @@ public:
 
   // rank accessor
   size_t get_rank() const { return width.size(); }
+
+  size_t get_width(size_t i) const { return width[i]; }
 
   // direct accessors. Similarly to std::vector, operator () does not perform
   // range check while at() does
@@ -742,25 +924,9 @@ public:
 
   // ====================================================================
 
-  // tensor(const expressions::tensor_expression<T, dynamic> &expression)
-  //     : tensor(expression.evaluate()) {}
-
-  // TODO: implement this method in every tensor template specialization
   template <char... Is>
   expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
     return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
-  }
-
-  auto elements_count() { return stride[0] * width[0]; }
-
-  std::vector<size_t> build_index(size_t i) {
-    std::vector<size_t> result;
-
-    for (size_t k = 0; k < stride.size(); k++) {
-      result.push_back((i / stride[k]) % width[k]);
-    }
-
-    return result;
   }
 
   // ====================================================================
@@ -818,12 +984,8 @@ public:
 private:
   tensor() = default;
   std::shared_ptr<std::vector<T>> data;
-
-public:
   dynamic::width_type width;
   dynamic::index_type stride;
-
-private:
   T *start_ptr;
 };
 
@@ -875,6 +1037,8 @@ public:
 
   // not static so that it can be called with . rather than ::
   constexpr size_t get_rank() const { return R; }
+
+  size_t get_width(size_t i) const { return width[i]; }
 
   // direct accessors as for dynamic tensor
   T &operator()(const size_t dimensions[R]) const {
@@ -1007,17 +1171,22 @@ public:
     return result;
   }
 
+  // ====================================================================
+
+  template <char... Is>
+  expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
+    return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
+  }
+
+  // ====================================================================
+
   friend class tensor<T, rank<R + 1>>;
 
 private:
   tensor() = default;
   std::shared_ptr<std::vector<T>> data;
-
-public:
   typename rank<R>::width_type width;
   typename rank<R>::index_type stride;
-
-private:
   T *start_ptr;
 };
 
@@ -1037,11 +1206,9 @@ public:
   // different tensor types.
   template <typename, typename> friend class tensor;
 
-  template <typename, class> friend class tensor_constant;
-  template <typename, class, typename, typename> friend class tensor_mult;
-  template <typename, class> friend class tensor_expression;
-
   constexpr size_t get_rank() const { return 1; }
+
+  size_t get_width(size_t i) const { return width[i]; }
 
   // direct accessors as for dynamic tensor
   T &operator()(size_t d) const { return start_ptr[d * stride[0]]; }
@@ -1078,6 +1245,15 @@ public:
     result.start_ptr += result.stride[0] * begin;
     return result;
   }
+
+  // ====================================================================
+
+  template <char... Is>
+  expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
+    return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
+  }
+
+  // ====================================================================
 
   typedef T *iterator;
   iterator begin(size_t = 0) { return start_ptr; }
