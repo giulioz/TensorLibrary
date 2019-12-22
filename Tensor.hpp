@@ -185,7 +185,7 @@ template <typename, typename> class tensor_constant;
 
 template <typename, typename, typename> class tensor_addition;
 
-// template <typename, typename> class tensor_negation; // TODO
+template <typename, typename> class tensor_negation;
 
 template <typename, typename, typename> class tensor_multiplication;
 
@@ -201,11 +201,10 @@ struct term_multi_vars<tensor_addition<T, A, B>> {
   using value = typename single_vars<typename term_multi_vars<A>::value>::value;
 };
 
-/*
 template <typename T, typename A>
 struct term_multi_vars<tensor_negation<T, A>> {
-    using value = typename term_multi_vars<A>::value;
-}; */
+  using value = typename term_multi_vars<A>::value;
+};
 
 template <typename T, typename A, typename B>
 struct term_multi_vars<tensor_multiplication<T, A, B>> {
@@ -230,12 +229,10 @@ struct validate_expression<tensor_addition<T, A, B>> {
           value;
 };
 
-/*
 template <typename T, typename A>
 struct validate_expression<tensor_negation<T, A>> {
   constexpr static bool value = validate_expression<A>::value;
 };
-*/
 
 template <typename T, typename A, typename B>
 struct validate_expression<tensor_multiplication<T, A, B>> {
@@ -258,17 +255,23 @@ public:
   }
 
   template <typename Derived1>
-  tensor_addition<T, Derived, Derived1>
+  inline tensor_addition<T, Derived, Derived1>
   operator+(const tensor_expression<T, Derived1> &other) const {
     return tensor_addition<T, Derived, Derived1>(*this, other);
   }
 
-  // operator-(); // TODO
-
-  // operator-(other); // TODO
+  inline tensor_negation<T, Derived> operator-() const {
+    return tensor_negation<T, Derived>(*this);
+  }
 
   template <typename Derived1>
-  tensor_multiplication<T, Derived, Derived1>
+  inline tensor_addition<T, Derived, Derived1>
+  operator-(const tensor_expression<T, Derived1> &other) const {
+    return tensor_addition<T, Derived, Derived1>(*this, other.operator-());
+  }
+
+  template <typename Derived1>
+  inline tensor_multiplication<T, Derived, Derived1>
   operator*(const tensor_expression<T, Derived1> &other) const {
     return tensor_multiplication<T, Derived, Derived1>(*this, other);
   }
@@ -321,7 +324,7 @@ public:
   }
 
 protected:
-  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+  inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return static_cast<const Derived *>(this)->evaluate_direct(vars_values);
   }
 
@@ -341,11 +344,11 @@ protected:
     return result;
   }
 
-  size_t get_dimension(char v) const {
+  inline size_t get_dimension(char v) const {
     return static_cast<const Derived *>(this)->get_dimension(v);
   }
 
-  const std::map<char, size_t> &get_dimensions() const {
+  inline const std::map<char, size_t> &get_dimensions() const {
     return static_cast<const Derived *>(this)->get_dimensions();
   }
 
@@ -412,8 +415,7 @@ public:
   template <typename, typename> friend class tensor_expression;
   template <typename, typename> friend class tensor_constant;
   template <typename, typename, typename> friend class tensor_addition;
-  // template <typename, typename> friend class tensor_negation; // TODO: enable
-  // this
+  template <typename, typename> friend class tensor_negation;
   template <typename, typename, typename> friend class tensor_multiplication;
 
 protected:
@@ -425,9 +427,11 @@ protected:
     return my_tensor(indexes);
   }
 
-  size_t get_dimension(char v) const { return dimensions.at(v); }
+  inline size_t get_dimension(char v) const { return dimensions.at(v); }
 
-  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
+  inline const std::map<char, size_t> &get_dimensions() const {
+    return dimensions;
+  }
 
 private:
   const tensor<T> my_tensor;
@@ -464,27 +468,28 @@ public:
   template <typename, typename> friend class tensor_expression;
   template <typename, typename> friend class tensor_constant;
   template <typename, typename, typename> friend class tensor_addition;
-  // template <typename, typename> friend class tensor_negation; // TODO: enable
-  // this
+  template <typename, typename> friend class tensor_negation;
   template <typename, typename, typename> friend class tensor_multiplication;
 
 protected:
-  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+  inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return a.evaluate_summation(vars_values) +
            b.evaluate_summation(vars_values);
   }
 
-  size_t get_dimension(char v) const { return dimensions.at(v); }
+  inline size_t get_dimension(char v) const { return dimensions.at(v); }
 
-  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
+  inline const std::map<char, size_t> &get_dimensions() const {
+    return dimensions;
+  }
 
 private:
   const A a;
   const B b;
 
   bool init_dimensions() {
-    std::map<char, size_t> &dimensions_a = a.get_dimensions();
-    std::map<char, size_t> &dimensions_b = b.get_dimensions();
+    const std::map<char, size_t> &dimensions_a = a.get_dimensions();
+    const std::map<char, size_t> &dimensions_b = b.get_dimensions();
     for (auto &i : dimensions_a) {
       if (dimensions.count(i.first) > 0) {
         if (dimensions[i.first] != i.second) {
@@ -509,7 +514,41 @@ private:
   std::map<char, size_t> dimensions;
 };
 
-// template <typename, typename> class tensor_negation; // TODO
+template <typename T, typename A>
+class tensor_negation : public tensor_expression<T, tensor_negation<T, A>> {
+public:
+  tensor_negation(const tensor_expression<T, A> &a)
+      : a(static_cast<const A &>(a)) {
+    assert(init_dimensions());
+  }
+
+  template <typename, typename> friend class tensor_expression;
+  template <typename, typename> friend class tensor_constant;
+  template <typename, typename, typename> friend class tensor_addition;
+  template <typename, typename> friend class tensor_negation;
+  template <typename, typename, typename> friend class tensor_multiplication;
+
+protected:
+  inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+    return -a.evaluate_direct(vars_values);
+  }
+
+  inline size_t get_dimension(char v) const { return dimensions.at(v); }
+
+  inline const std::map<char, size_t> &get_dimensions() const {
+    return dimensions;
+  }
+
+private:
+  const A a;
+
+  bool init_dimensions() {
+    dimensions = a.get_dimensions();
+    return true;
+  }
+
+  std::map<char, size_t> dimensions;
+};
 
 template <typename T, typename A, typename B>
 class tensor_multiplication
@@ -524,26 +563,27 @@ public:
   template <typename, typename> friend class tensor_expression;
   template <typename, typename> friend class tensor_constant;
   template <typename, typename, typename> friend class tensor_addition;
-  // template <typename, typename> friend class tensor_negation; // TODO: enable
-  // this
+  template <typename, typename> friend class tensor_negation;
   template <typename, typename, typename> friend class tensor_multiplication;
 
 protected:
-  T evaluate_direct(const std::map<char, size_t> &vars_values) const {
+  inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return a.evaluate_direct(vars_values) * b.evaluate_direct(vars_values);
   }
 
-  size_t get_dimension(char v) const { return dimensions.at(v); }
+  inline size_t get_dimension(char v) const { return dimensions.at(v); }
 
-  const std::map<char, size_t> &get_dimensions() const { return dimensions; }
+  inline const std::map<char, size_t> &get_dimensions() const {
+    return dimensions;
+  }
 
 private:
   const A a;
   const B b;
 
   bool init_dimensions() {
-    std::map<char, size_t> &dimensions_a = a.get_dimensions();
-    std::map<char, size_t> &dimensions_b = b.get_dimensions();
+    const std::map<char, size_t> &dimensions_a = a.get_dimensions();
+    const std::map<char, size_t> &dimensions_b = b.get_dimensions();
     for (auto &i : dimensions_a) {
       if (dimensions.count(i.first) > 0) {
         if (dimensions[i.first] != i.second) {
@@ -925,7 +965,7 @@ public:
   // ====================================================================
 
   template <char... Is>
-  expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
+  inline expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
     return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
   }
 
@@ -1174,7 +1214,7 @@ public:
   // ====================================================================
 
   template <char... Is>
-  expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
+  inline expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
     return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
   }
 
@@ -1249,7 +1289,7 @@ public:
   // ====================================================================
 
   template <char... Is>
-  expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
+  inline expressions::tensor_constant<T, expressions::vars<Is...>> ein() {
     return expressions::tensor_constant<T, expressions::vars<Is...>>(*this);
   }
 
