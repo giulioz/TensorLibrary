@@ -21,53 +21,71 @@ struct dynamic {
 };
 
 // policy for fixed-rank tensors
-template <size_t R> struct rank {
+template <size_t R>
+struct rank {
   typedef std::array<size_t, R> index_type;
   typedef std::array<size_t, R> width_type;
 };
 
 // tensor type
-template <typename T, class type = dynamic> class tensor;
+template <typename T, class type = dynamic>
+class tensor;
 
 // ====================================================================
 
 namespace expressions {
 
-template <char...> struct vars;
+template <char...>
+struct vars;
 
-template <typename, typename> struct concat_vars;
+template <typename, typename>
+struct concat_vars;
 
-template <typename, typename = void> struct single_vars;
+template <typename, typename = void>
+struct single_vars;
 
-template <typename, typename = void> struct double_vars;
+template <typename, typename = void>
+struct double_vars;
 
-template <typename, typename = void> struct at_most_2_equals_vars;
+template <typename, typename = void>
+struct at_most_2_equals_vars;
 
-template <typename, typename, typename = void> struct match_vars;
+template <typename, typename, typename = void>
+struct match_vars;
 
-template <char, typename> struct count_var;
+template <char, typename>
+struct count_var;
 
-template <char, typename> struct find_var;
+template <char, typename>
+struct find_var;
 
-template <char, typename> struct remove_var;
+template <char, typename>
+struct remove_var;
 
-template <char... Is> struct vars {
+template <char... Is>
+struct vars {
   constexpr static size_t size = sizeof...(Is);
   constexpr static char id[sizeof...(Is)] = {Is...};
 };
 
-template <char... Is> constexpr char vars<Is...>::id[sizeof...(Is)];
+template <char... Is>
+constexpr char vars<Is...>::id[sizeof...(Is)];
 
-template <> struct vars<> {
+template <>
+struct vars<> {
   constexpr static size_t size = 0;
   constexpr static char id[1] = {'\0'};
 };
 
 constexpr char vars<>::id[1];
 
-template <> struct single_vars<vars<>> { using value = vars<>; };
+template <>
+struct single_vars<vars<>> {
+  using value = vars<>;
+};
 
-template <char... As, char... Bs> struct concat_vars<vars<As...>, vars<Bs...>> {
+template <char... As, char... Bs>
+struct concat_vars<vars<As...>, vars<Bs...>> {
   using value = vars<As..., Bs...>;
 };
 
@@ -87,7 +105,10 @@ struct single_vars<
                            typename single_vars<vars<Ts...>>::value>::value;
 };
 
-template <> struct double_vars<vars<>> { using value = vars<>; };
+template <>
+struct double_vars<vars<>> {
+  using value = vars<>;
+};
 
 template <char H, char... Ts>
 struct double_vars<vars<H, Ts...>, typename std::enable_if<
@@ -104,7 +125,8 @@ struct double_vars<
   using value = typename double_vars<vars<Ts...>>::value;
 };
 
-template <> struct at_most_2_equals_vars<vars<>> {
+template <>
+struct at_most_2_equals_vars<vars<>> {
   constexpr static bool value = true;
 };
 
@@ -123,7 +145,8 @@ struct at_most_2_equals_vars<
       at_most_2_equals_vars<typename remove_var<H, vars<Ts...>>::value>::value;
 };
 
-template <> struct match_vars<vars<>, vars<>> {
+template <>
+struct match_vars<vars<>, vars<>> {
   constexpr static bool value = true;
 };
 
@@ -143,53 +166,70 @@ struct match_vars<
                  typename remove_var<A, vars<Bs...>>::value>::value;
 };
 
-template <char I> struct count_var<I, vars<>> {
+template <char I>
+struct count_var<I, vars<>> {
   constexpr static size_t value = 0;
 };
 
-template <char I, char... Ts> struct count_var<I, vars<I, Ts...>> {
+template <char I, char... Ts>
+struct count_var<I, vars<I, Ts...>> {
   constexpr static size_t value = 1 + count_var<I, vars<Ts...>>::value;
 };
 
-template <char I, char H, char... Ts> struct count_var<I, vars<H, Ts...>> {
+template <char I, char H, char... Ts>
+struct count_var<I, vars<H, Ts...>> {
   constexpr static size_t value = count_var<I, vars<Ts...>>::value;
 };
 
-template <char I> struct find_var<I, vars<>> {
+template <char I>
+struct find_var<I, vars<>> {
   constexpr static bool value = false;
 };
 
-template <char I, char... Ts> struct find_var<I, vars<I, Ts...>> {
+template <char I, char... Ts>
+struct find_var<I, vars<I, Ts...>> {
   constexpr static bool value = true;
 };
 
-template <char I, char H, char... Ts> struct find_var<I, vars<H, Ts...>> {
+template <char I, char H, char... Ts>
+struct find_var<I, vars<H, Ts...>> {
   constexpr static bool value = find_var<I, vars<Ts...>>::value;
 };
 
-template <char I> struct remove_var<I, vars<>> { using value = vars<>; };
+template <char I>
+struct remove_var<I, vars<>> {
+  using value = vars<>;
+};
 
-template <char I, char... Ts> struct remove_var<I, vars<I, Ts...>> {
+template <char I, char... Ts>
+struct remove_var<I, vars<I, Ts...>> {
   using value = typename remove_var<I, vars<Ts...>>::value;
 };
 
-template <char I, char H, char... Ts> struct remove_var<I, vars<H, Ts...>> {
+template <char I, char H, char... Ts>
+struct remove_var<I, vars<H, Ts...>> {
   using value =
       typename concat_vars<vars<H>,
                            typename remove_var<I, vars<Ts...>>::value>::value;
 };
 
-template <typename, typename> class tensor_expression;
+template <typename, typename>
+class tensor_expression;
 
-template <typename, typename> class tensor_constant;
+template <typename, typename>
+class tensor_constant;
 
-template <typename, typename, typename> class tensor_addition;
+template <typename, typename, typename>
+class tensor_addition;
 
-template <typename, typename> class tensor_negation;
+template <typename, typename>
+class tensor_negation;
 
-template <typename, typename, typename> class tensor_multiplication;
+template <typename, typename, typename>
+class tensor_multiplication;
 
-template <typename> struct term_multi_vars;
+template <typename>
+struct term_multi_vars;
 
 template <typename T, char... Is>
 struct term_multi_vars<tensor_constant<T, vars<Is...>>> {
@@ -212,7 +252,8 @@ struct term_multi_vars<tensor_multiplication<T, A, B>> {
                                      typename term_multi_vars<B>::value>::value;
 };
 
-template <typename> struct validate_expression;
+template <typename>
+struct validate_expression;
 
 template <typename T, char... Is>
 struct validate_expression<tensor_constant<T, vars<Is...>>> {
@@ -242,8 +283,9 @@ struct validate_expression<tensor_multiplication<T, A, B>> {
           tensor_multiplication<T, A, B>>::value>::value;
 };
 
-template <typename T, typename Derived> class tensor_expression {
-public:
+template <typename T, typename Derived>
+class tensor_expression {
+ public:
   using free_vars =
       typename single_vars<typename term_multi_vars<Derived>::value>::value;
   using repeated_vars =
@@ -255,8 +297,8 @@ public:
   }
 
   template <typename Derived1>
-  inline tensor_addition<T, Derived, Derived1>
-  operator+(const tensor_expression<T, Derived1> &other) const {
+  inline tensor_addition<T, Derived, Derived1> operator+(
+      const tensor_expression<T, Derived1> &other) const {
     return tensor_addition<T, Derived, Derived1>(*this, other);
   }
 
@@ -265,14 +307,14 @@ public:
   }
 
   template <typename Derived1>
-  inline tensor_addition<T, Derived, Derived1>
-  operator-(const tensor_expression<T, Derived1> &other) const {
+  inline tensor_addition<T, Derived, Derived1> operator-(
+      const tensor_expression<T, Derived1> &other) const {
     return tensor_addition<T, Derived, Derived1>(*this, other.operator-());
   }
 
   template <typename Derived1>
-  inline tensor_multiplication<T, Derived, Derived1>
-  operator*(const tensor_expression<T, Derived1> &other) const {
+  inline tensor_multiplication<T, Derived, Derived1> operator*(
+      const tensor_expression<T, Derived1> &other) const {
     return tensor_multiplication<T, Derived, Derived1>(*this, other);
   }
 
@@ -323,7 +365,7 @@ public:
     return result;
   }
 
-protected:
+ protected:
   inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return static_cast<const Derived *>(this)->evaluate_direct(vars_values);
   }
@@ -352,7 +394,7 @@ protected:
     return static_cast<const Derived *>(this)->get_dimensions();
   }
 
-private:
+ private:
   size_t count_vars_values(const char id[], const size_t size) const {
     size_t result = 1;
     for (size_t i = 0; i < size; ++i) {
@@ -372,18 +414,17 @@ private:
     return result;
   }
 
-  std::map<char, size_t>
-  bind_vars_values(std::map<char, size_t> orig,
-                   const std::map<char, size_t> &edit) const {
+  std::map<char, size_t> bind_vars_values(
+      std::map<char, size_t> orig, const std::map<char, size_t> &edit) const {
     for (auto &i : edit) {
       orig[i.first] = i.second;
     }
     return orig;
   }
 
-  std::vector<size_t>
-  to_indexes(const char id[], const size_t size,
-             const std::map<char, size_t> &vars_values) const {
+  std::vector<size_t> to_indexes(
+      const char id[], const size_t size,
+      const std::map<char, size_t> &vars_values) const {
     std::vector<size_t> result;
     if (size > 0) {
       for (size_t i = 0; i < size; i++) {
@@ -399,7 +440,7 @@ private:
 template <typename T, char... Is>
 class tensor_constant<T, vars<Is...>>
     : public tensor_expression<T, tensor_constant<T, vars<Is...>>> {
-public:
+ public:
   tensor_constant(const tensor<T> &my_tensor) : my_tensor(my_tensor) {
     assert(my_tensor.get_rank() == sizeof...(Is));
     assert(init_dimensions());
@@ -412,13 +453,18 @@ public:
     assert(init_dimensions());
   }
 
-  template <typename, typename> friend class tensor_expression;
-  template <typename, typename> friend class tensor_constant;
-  template <typename, typename, typename> friend class tensor_addition;
-  template <typename, typename> friend class tensor_negation;
-  template <typename, typename, typename> friend class tensor_multiplication;
+  template <typename, typename>
+  friend class tensor_expression;
+  template <typename, typename>
+  friend class tensor_constant;
+  template <typename, typename, typename>
+  friend class tensor_addition;
+  template <typename, typename>
+  friend class tensor_negation;
+  template <typename, typename, typename>
+  friend class tensor_multiplication;
 
-protected:
+ protected:
   T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     std::vector<size_t> indexes;
     for (size_t i = 0; i < vars<Is...>::size; i++) {
@@ -433,7 +479,7 @@ protected:
     return dimensions;
   }
 
-private:
+ private:
   const tensor<T> my_tensor;
 
   bool init_dimensions() {
@@ -455,7 +501,7 @@ private:
 
 template <typename T, typename A, typename B>
 class tensor_addition : public tensor_expression<T, tensor_addition<T, A, B>> {
-public:
+ public:
   using free_vars = typename term_multi_vars<tensor_addition<T, A, B>>::value;
   using repeated_vars = vars<>;
 
@@ -465,13 +511,18 @@ public:
     assert(init_dimensions());
   }
 
-  template <typename, typename> friend class tensor_expression;
-  template <typename, typename> friend class tensor_constant;
-  template <typename, typename, typename> friend class tensor_addition;
-  template <typename, typename> friend class tensor_negation;
-  template <typename, typename, typename> friend class tensor_multiplication;
+  template <typename, typename>
+  friend class tensor_expression;
+  template <typename, typename>
+  friend class tensor_constant;
+  template <typename, typename, typename>
+  friend class tensor_addition;
+  template <typename, typename>
+  friend class tensor_negation;
+  template <typename, typename, typename>
+  friend class tensor_multiplication;
 
-protected:
+ protected:
   inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return a.evaluate_summation(vars_values) +
            b.evaluate_summation(vars_values);
@@ -483,7 +534,7 @@ protected:
     return dimensions;
   }
 
-private:
+ private:
   const A a;
   const B b;
 
@@ -516,19 +567,24 @@ private:
 
 template <typename T, typename A>
 class tensor_negation : public tensor_expression<T, tensor_negation<T, A>> {
-public:
+ public:
   tensor_negation(const tensor_expression<T, A> &a)
       : a(static_cast<const A &>(a)) {
     assert(init_dimensions());
   }
 
-  template <typename, typename> friend class tensor_expression;
-  template <typename, typename> friend class tensor_constant;
-  template <typename, typename, typename> friend class tensor_addition;
-  template <typename, typename> friend class tensor_negation;
-  template <typename, typename, typename> friend class tensor_multiplication;
+  template <typename, typename>
+  friend class tensor_expression;
+  template <typename, typename>
+  friend class tensor_constant;
+  template <typename, typename, typename>
+  friend class tensor_addition;
+  template <typename, typename>
+  friend class tensor_negation;
+  template <typename, typename, typename>
+  friend class tensor_multiplication;
 
-protected:
+ protected:
   inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return -a.evaluate_direct(vars_values);
   }
@@ -539,7 +595,7 @@ protected:
     return dimensions;
   }
 
-private:
+ private:
   const A a;
 
   bool init_dimensions() {
@@ -553,20 +609,25 @@ private:
 template <typename T, typename A, typename B>
 class tensor_multiplication
     : public tensor_expression<T, tensor_multiplication<T, A, B>> {
-public:
+ public:
   tensor_multiplication(const tensor_expression<T, A> &a,
                         const tensor_expression<T, B> &b)
       : a(static_cast<const A &>(a)), b(static_cast<const B &>(b)) {
     assert(init_dimensions());
   }
 
-  template <typename, typename> friend class tensor_expression;
-  template <typename, typename> friend class tensor_constant;
-  template <typename, typename, typename> friend class tensor_addition;
-  template <typename, typename> friend class tensor_negation;
-  template <typename, typename, typename> friend class tensor_multiplication;
+  template <typename, typename>
+  friend class tensor_expression;
+  template <typename, typename>
+  friend class tensor_constant;
+  template <typename, typename, typename>
+  friend class tensor_addition;
+  template <typename, typename>
+  friend class tensor_negation;
+  template <typename, typename, typename>
+  friend class tensor_multiplication;
 
-protected:
+ protected:
   inline T evaluate_direct(const std::map<char, size_t> &vars_values) const {
     return a.evaluate_direct(vars_values) * b.evaluate_direct(vars_values);
   }
@@ -577,7 +638,7 @@ protected:
     return dimensions;
   }
 
-private:
+ private:
   const A a;
   const B b;
 
@@ -608,14 +669,15 @@ private:
   std::map<char, size_t> dimensions;
 };
 
-} // namespace expressions
+}  // namespace expressions
 
 // ====================================================================
 
 namespace reserved {
 // generic iterator used by all tensor classes (except rank 1 specializations)
-template <typename T, class type> class iterator {
-public:
+template <typename T, class type>
+class iterator {
+ public:
   T &operator*() const { return *ptr; }
 
   iterator &operator++() {
@@ -663,8 +725,7 @@ public:
   }
 
   iterator &operator-=(int v) {
-    if (v < 0)
-      return operator+=(-v);
+    if (v < 0) return operator+=(-v);
     size_t index = stride.size() - 1;
     while (v > 0 && index >= 0) {
       size_t val = v % width[index];
@@ -683,8 +744,7 @@ public:
   }
 
   iterator &operator+=(int v) {
-    if (v < 0)
-      return operator-=(-v);
+    if (v < 0) return operator-=(-v);
     size_t index = stride.size() - 1;
     while (v > 0 && index >= 0) {
       size_t val = v % width[index];
@@ -726,7 +786,7 @@ public:
 
   friend class tensor<T, type>;
 
-private:
+ private:
   iterator(const typename type::width_type &w,
            const typename type::index_type &s, T *p)
       : width(w), stride(s), idx(s), ptr(p) {
@@ -746,8 +806,9 @@ private:
 
 // iterator over single index
 // does not need to know actual tensor type
-template <typename T> class index_iterator {
-public:
+template <typename T>
+class index_iterator {
+ public:
   T &operator*() const { return *ptr; }
 
   index_iterator &operator++() {
@@ -795,19 +856,21 @@ public:
     return i.ptr == j.ptr;
   }
 
-  template <typename, typename> friend class ::tensor::tensor;
+  template <typename, typename>
+  friend class ::tensor::tensor;
 
-private:
+ private:
   index_iterator(size_t s, T *p) : stride(s), ptr(p) {}
 
   size_t stride;
   T *ptr;
 };
-} // namespace reserved
+}  // namespace reserved
 
 // tensor specialization for dynamic rank
-template <typename T> class tensor<T, dynamic> {
-public:
+template <typename T>
+class tensor<T, dynamic> {
+ public:
   // C-style constructor with explicit rank and pointer to array of dimensions
   // all other constructors are redirected to this one
   tensor(size_t rank, const size_t dimensions[])
@@ -822,7 +885,8 @@ public:
   tensor(std::initializer_list<size_t> dimensions)
       : tensor(dimensions.size(), &*dimensions.begin()) {}
 
-  template <size_t rank> tensor(const size_t dims[rank]) : tensor(rank, dims) {}
+  template <size_t rank>
+  tensor(const size_t dims[rank]) : tensor(rank, dims) {}
   template <typename... Dims>
   tensor(Dims... dims)
       : width({static_cast<const size_t>(dims)...}),
@@ -841,12 +905,15 @@ public:
   // all tensor types are friend
   // this are used by alien copy constructors, i.e. copy constructors copying
   // different tensor types.
-  template <typename, typename> friend class tensor;
+  template <typename, typename>
+  friend class tensor;
 
   template <size_t R>
   tensor(const tensor<T, rank<R>> &X)
-      : data(X.data), width(X.width.begin(), X.width.end()),
-        stride(X.stride.begin(), X.stride.end()), start_ptr(X.start_ptr) {}
+      : data(X.data),
+        width(X.width.begin(), X.width.end()),
+        stride(X.stride.begin(), X.stride.end()),
+        start_ptr(X.start_ptr) {}
 
   // rank accessor
   size_t get_rank() const { return width.size(); }
@@ -858,8 +925,7 @@ public:
   T &operator()(const size_t dimensions[]) const {
     const size_t rank = width.size();
     T *ptr = start_ptr;
-    for (size_t i = 0; i != rank; ++i)
-      ptr += dimensions[i] * stride[i];
+    for (size_t i = 0; i != rank; ++i) ptr += dimensions[i] * stride[i];
     return *ptr;
   }
   T &at(const size_t dimensions[]) const {
@@ -881,20 +947,24 @@ public:
     return at(&dimensions[0]);
   }
 
-  template <size_t rank> T &operator()(const size_t dimensions[rank]) const {
+  template <size_t rank>
+  T &operator()(const size_t dimensions[rank]) const {
     assert(rank == get_rank());
     return operator()(static_cast<const size_t *>(dimensions));
   }
-  template <size_t rank> T &at(const size_t dimensions[rank]) const {
+  template <size_t rank>
+  T &at(const size_t dimensions[rank]) const {
     assert(rank == get_rank());
     return at(static_cast<const size_t *>(dimensions));
   }
 
-  template <typename... Dims> T &operator()(Dims... dimensions) const {
+  template <typename... Dims>
+  T &operator()(Dims... dimensions) const {
     assert(sizeof...(dimensions) == get_rank());
     return operator()({static_cast<const size_t>(dimensions)...});
   }
-  template <typename... Dims> T &at(Dims... dimensions) const {
+  template <typename... Dims>
+  T &at(Dims... dimensions) const {
     assert(sizeof...(dimensions) == get_rank());
     return at({static_cast<const size_t>(dimensions)...});
   }
@@ -955,8 +1025,7 @@ public:
     result.width.insert(result.width.end(), width.begin(),
                         width.begin() + begin);
     result.width.insert(result.width.end(), width.begin() + end, width.end());
-    for (size_t i = begin; i != end; ++i)
-      result.width[end] *= width[i];
+    for (size_t i = begin; i != end; ++i) result.width[end] *= width[i];
     result.start_ptr = start_ptr;
     result.data = data;
     return result;
@@ -1021,7 +1090,7 @@ public:
                            (width[index] - dimensions[index]) * stride[index]);
   }
 
-private:
+ private:
   tensor() = default;
   std::shared_ptr<std::vector<T>> data;
   dynamic::width_type width;
@@ -1030,14 +1099,14 @@ private:
 };
 
 // tensor specialization for fixed-rank
-template <typename T, size_t R> class tensor<T, rank<R>> {
-public:
+template <typename T, size_t R>
+class tensor<T, rank<R>> {
+ public:
   // C-style constructor with implicit rank and pointer to array of dimensions
   // all other constructors are redirected to this one
   tensor(const size_t dimensions[R]) {
     size_t *wptr = &(width[0]), *endp = &(width[0]) + R;
-    while (wptr != endp)
-      *(wptr++) = *(dimensions++);
+    while (wptr != endp) *(wptr++) = *(dimensions++);
     stride[R - 1] = 1;
     for (size_t i = R - 1; i != 0; --i) {
       stride[i - 1] = stride[i] * width[i];
@@ -1067,11 +1136,14 @@ public:
   // all tensor types are friend
   // this are used by alien copy constructors, i.e. copy constructors copying
   // different tensor types.
-  template <typename, typename> friend class tensor;
+  template <typename, typename>
+  friend class tensor;
 
   tensor(const tensor<T, dynamic> &X)
-      : data(X.data), width(X.width.begin(), X.width.end()),
-        stride(X.stride.begin(), X.stride.end()), start_ptr(X.start_ptr) {
+      : data(X.data),
+        width(X.width.begin(), X.width.end()),
+        stride(X.stride.begin(), X.stride.end()),
+        start_ptr(X.start_ptr) {
     assert(X.get_rank() == R);
   }
 
@@ -1083,8 +1155,7 @@ public:
   // direct accessors as for dynamic tensor
   T &operator()(const size_t dimensions[R]) const {
     T *ptr = start_ptr;
-    for (size_t i = 0; i != R; ++i)
-      ptr += dimensions[i] * stride[i];
+    for (size_t i = 0; i != R; ++i) ptr += dimensions[i] * stride[i];
     return *ptr;
   }
   T &at(const size_t dimensions[R]) const {
@@ -1106,11 +1177,13 @@ public:
   }
 
   // could use std::enable_if rather than static assert!
-  template <typename... Dims> T &operator()(Dims... dimensions) const {
+  template <typename... Dims>
+  T &operator()(Dims... dimensions) const {
     static_assert(sizeof...(dimensions) == R, "rank mismatch");
     return operator()({static_cast<const size_t>(dimensions)...});
   }
-  template <typename... Dims> T &at(Dims... dimensions) const {
+  template <typename... Dims>
+  T &at(Dims... dimensions) const {
     static_assert(sizeof...(dimensions) == R, "rank mismatch");
     return at({static_cast<const size_t>(dimensions)...});
   }
@@ -1204,8 +1277,7 @@ public:
                         width.begin() + begin);
     result.stride.insert(result.stride.end(), stride.begin() + end,
                          stride.end());
-    for (size_t i = begin; i != end; ++i)
-      result.width[end] *= width[i];
+    for (size_t i = begin; i != end; ++i) result.width[end] *= width[i];
     result.start_ptr = start_ptr;
     result.data = data;
     return result;
@@ -1222,7 +1294,7 @@ public:
 
   friend class tensor<T, rank<R + 1>>;
 
-private:
+ private:
   tensor() = default;
   std::shared_ptr<std::vector<T>> data;
   typename rank<R>::width_type width;
@@ -1232,8 +1304,9 @@ private:
 
 // tensor specialization for rank 1
 // in this case splicing provides reference to data element
-template <typename T> class tensor<T, rank<1>> {
-public:
+template <typename T>
+class tensor<T, rank<1>> {
+ public:
   tensor(size_t dimension) {
     data = std::make_shared<std::vector<T>>(dimension);
     start_ptr = &*(data->begin());
@@ -1244,7 +1317,8 @@ public:
   // all tensor types are friend
   // this are used by alien copy constructors, i.e. copy constructors copying
   // different tensor types.
-  template <typename, typename> friend class tensor;
+  template <typename, typename>
+  friend class tensor;
 
   constexpr size_t get_rank() const { return 1; }
 
@@ -1301,7 +1375,7 @@ public:
 
   friend class tensor<T, rank<2>>;
 
-private:
+ private:
   tensor() = default;
   std::shared_ptr<std::vector<T>> data;
   rank<1>::width_type width;
@@ -1309,6 +1383,6 @@ private:
   T *start_ptr;
 };
 
-} // namespace tensor
+}  // namespace tensor
 
-#endif // TENSOR
+#endif  // TENSOR
