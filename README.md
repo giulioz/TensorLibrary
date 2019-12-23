@@ -199,6 +199,38 @@ class tensor_multiplication
 };
 ```
 
+Another template, named `match_vars`, uses *SFINAE* recursively to check if two `vars` types have the same variables inside:
+
+```cpp
+template <typename, typename, typename = void>
+struct match_vars;
+
+template <>
+struct match_vars<vars<>, vars<>> {
+  constexpr static bool value = true;
+};
+
+template <char... As, char... Bs>
+struct match_vars<
+    vars<As...>, vars<Bs...>,
+    typename std::enable_if<
+      sizeof...(As) != sizeof...(Bs)>::type> {
+  constexpr static bool value = false;
+};
+
+template <char A, char... As, char... Bs>
+struct match_vars<
+    vars<A, As...>, vars<Bs...>,
+    typename std::enable_if<
+      1 + sizeof...(As) == sizeof...(Bs)>::type> {
+  constexpr static bool value =
+      match_vars<
+          typename remove_var<A, vars<As...>>::value,
+          typename remove_var<A, vars<Bs...>>::value
+      >::value;
+};
+```
+
 Expression validation in compile-time is done using the `validate_expression` type, which takes a `vars` type checking the validity recursively on all child expression. For example:
 
 ```cpp
