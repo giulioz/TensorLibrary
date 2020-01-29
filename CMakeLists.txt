@@ -7,5 +7,5 @@ add_compile_options(
   "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-g3"
 )
 
-add_executable(tensor-library main.cc)
+add_executable(tensor-library einstein.cc tensor.cc)
 target_link_libraries(tensor-library stdc++)
