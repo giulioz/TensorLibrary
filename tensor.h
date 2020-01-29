@@ -266,7 +266,7 @@ public:
     T& operator()(const size_t dimensions[]) const {
         const size_t rank = width.size();
         T* ptr=start_ptr;
-        for(int i=0; i!=rank; ++i) ptr += dimensions[i]*stride[i];
+        for(size_t i=0; i!=rank; ++i) ptr += dimensions[i]*stride[i];
         return *ptr;
     }
     T& at(const size_t dimensions[]) const {
