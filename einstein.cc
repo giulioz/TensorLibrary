@@ -12,6 +12,16 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
 
 #define SIZE 200
 
+/*
+  BASELINE:
+  elapsed time: 0.00755127
+  elapsed time: 3.90089
+  elapsed time: 2.86574
+  elapsed time: 2.83354
+  elapsed time: 0.0114298
+  elapsed time: 2.94815
+*/
+
 int main() {
   tensor<int, rank<2>> t1(2 * SIZE, 2 * SIZE), t2(2 * SIZE, 2 * SIZE);
 

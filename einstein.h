@@ -1,6 +1,7 @@
 #ifndef EINSTEIN
 #define EINSTEIN
 #include<map>
+#include<thread>
 
 namespace Tensor {
 /*
@@ -149,6 +150,7 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
+        // PARALLEL HERE!
         while(!end()) {
             eval()=0;
             next();
