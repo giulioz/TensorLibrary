@@ -272,7 +272,7 @@ public:
     T& at(const size_t dimensions[]) const {
         const size_t rank = width.size();
         T* ptr=start_ptr;
-        for(int i=0; i!=rank; ++i) {
+        for(size_t i=0; i!=rank; ++i) {
             assert(dimensions[i]<width[i]);
             ptr += dimensions[i]*stride[i];
         }

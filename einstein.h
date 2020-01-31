@@ -168,7 +168,7 @@ public:
         setup();
         x.setup();
 
-
+        // PARALLEL HERE!
         while(!end()) {
             eval() += x.eval();
             next();
