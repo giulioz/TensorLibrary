@@ -10,7 +10,8 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
   return out << id << ' ' << Index_Set<ids...>();
 }
 
-#define SIZE 200
+// #define SIZE 200
+#define SIZE 20
 
 /*
   BASELINE:
@@ -23,9 +24,9 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
 */
 
 int main() {
-  tensor<int, rank<2>> t1(2 * SIZE, 2 * SIZE), t2(2 * SIZE, 2 * SIZE);
+  tensor<size_t, rank<2>> t1(SIZE, SIZE), t2(SIZE, SIZE);
 
-  int count = 0;
+  size_t count = 0;
   for (auto iter = t1.begin(); iter != t1.end(); ++iter)
     *iter = count++;
   // for (auto iter = t1.begin(); iter != t1.end(); ++iter)
@@ -43,14 +44,14 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
+
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  tensor<int> t3(2 * SIZE, 2 * SIZE, 2 * SIZE), t4(2 * SIZE);
+  tensor<size_t> t3(SIZE, SIZE, SIZE), t4(SIZE);
   auto k = new_index;
   count = 0;
   for (auto iter = t3.begin(); iter != t3.end(); ++iter)
@@ -64,15 +65,15 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-  }
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
 
-  // for (auto iter = t3.begin(); iter != t3.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-  // for (auto iter = t4.begin(); iter != t4.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
+    // for (auto iter = t3.begin(); iter != t3.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
+    for (auto iter = t4.begin(); iter != t4.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
 
   {
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -82,12 +83,12 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-  }
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
 
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
 
   {
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -97,41 +98,41 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-  }
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
 
-  // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
-
-  {
-    auto start_time = std::chrono::high_resolution_clock::now();
-
-    tensor<int, rank<2>> t5 = t1(i, j);
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    double elapsed_time =
-        std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
-
-    // for (auto iter = t5.begin(); iter != t5.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    tensor<int, rank<2>> t6 = t3(i, j, k) * t4(j);
+    tensor<size_t, rank<2>> t5 = t1(i, j);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    std::cout << "elapsed time: " << elapsed_time << '\n';
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t6.begin(); iter != t6.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t5.begin(); iter != t5.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
+
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    tensor<size_t, rank<2>> t6 = t3(i, j, k) * t4(j);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    double elapsed_time =
+        std::chrono::duration<double>(end_time - start_time).count();
+    // std::cout << "elapsed time: " << elapsed_time << '\n';
+
+    for (auto iter = t6.begin(); iter != t6.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   return 0;

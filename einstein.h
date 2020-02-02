@@ -1,7 +1,10 @@
 #ifndef EINSTEIN
 #define EINSTEIN
 #include<map>
+#include<array>
+#include<vector>
 #include<thread>
+#include<cmath>
 
 namespace Tensor {
 /*
@@ -110,7 +113,115 @@ template<unsigned head, unsigned...tail, class U> struct is_same_nonrepeat<Index
 
 
 
+template<typename T>
+class parallel_clearer {
+public:
+    parallel_clearer(size_t startI, size_t to_run,
+        std::vector<size_t> widths,
+        std::vector<size_t> strides,
+        std::vector<size_t> idxs,
+        T* current_ptr)
+      : widths(widths), strides(strides),
+        idxs(idxs), current_ptr(current_ptr),
+        to_run(to_run) {
+        while (startI) {
+            next();
+            startI--;
+        }
+    }
 
+    void operator()() {
+        while(!end() && to_run > 0) {
+            eval()=0;
+            next();
+            to_run--;
+        }
+    }
+
+private:
+    bool end() { return idxs[0]==widths[0]; }
+
+    T& eval() { return *current_ptr; }
+
+    void next() {
+        unsigned index = idxs.size()-1;
+        ++idxs[index];
+        current_ptr += strides[index];
+
+        while(idxs[index]==widths[index] && index>0) {
+            idxs[index]=0;
+            current_ptr -= widths[index]*strides[index];
+
+            --index;
+            ++idxs[index];
+            current_ptr += strides[index];
+        }
+    }
+
+    std::vector<size_t> widths;
+    std::vector<size_t> strides;
+    std::vector<size_t> idxs;
+
+    T* current_ptr;
+
+    size_t to_run;
+};
+
+template<typename ExecutorType, typename T>
+class executor_pool {
+public:
+    executor_pool(
+        unsigned int ex_count,
+        std::vector<size_t> widths,
+        std::vector<size_t> strides,
+        std::vector<size_t> idxs,
+        T* current_ptr) {
+
+        size_t elements_count = 0;
+        for (size_t i = 0; i < widths.size(); i++) {
+            if (i == 0) {
+                elements_count = widths[i];
+            } else {
+                elements_count *= widths[i];
+            }
+        }
+
+        size_t elements_per_executor = floor(elements_count / ex_count);
+        size_t so_far = 0;
+        for (size_t i = 0; i < ex_count; i++) {
+            if (i == ex_count - 1) {
+                elements_per_executor = elements_count - so_far;
+            }
+
+            executors.push_back(
+                ExecutorType(
+                    so_far,
+                    elements_per_executor,
+                    widths,
+                    strides,
+                    idxs,
+                    current_ptr
+                )
+            );
+
+            so_far += elements_per_executor;
+        }
+    }
+
+    void run() {
+        std::vector<std::thread> threads;
+
+        for (auto &&ex : executors) {
+            threads.push_back(std::thread(std::ref(ex)));
+        }
+        for (auto &&t : threads) {
+            t.join();
+        }
+    }
+
+private:
+    std::vector<ExecutorType> executors;
+};
 
 
 
@@ -150,11 +261,26 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
+
+        // std::cout << "WIDTHS:";
+        // for (auto &&i : widths) {
+        //     std::cout << i << ", ";
+        // }
+        // std::cout << std::endl;
+
+        // std::cout << "STRIDES:";
+        // for (auto &&i : strides) {
+        //     std::cout << i << ", ";
+        // }
+        // std::cout << std::endl;
+        
         // PARALLEL HERE!
-        while(!end()) {
-            eval()=0;
-            next();
-        }
+        // while(!end()) {
+        //     eval()=0;
+        //     next();
+        // }
+
+        set_zeroes_parallel();
 
         //align index maps + sanity checking
         for (auto i=x_index_map.begin(); i!=x_index_map.end(); ++i) {
@@ -169,6 +295,18 @@ public:
         assert(index_map.size()==x_index_map.size());
         setup();
         x.setup();
+
+        // std::cout << "WIDTHS:";
+        // for (auto &&i : widths) {
+        //     std::cout << i << ", ";
+        // }
+        // std::cout << std::endl;
+
+        // std::cout << "STRIDES:";
+        // for (auto &&i : strides) {
+        //     std::cout << i << ", ";
+        // }
+        // std::cout << std::endl;
 
         // PARALLEL HERE!
         while(!end()) {
@@ -216,6 +354,12 @@ public:
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
 
 protected:
+
+    void set_zeroes_parallel() {
+        auto pool = executor_pool<parallel_clearer<T>, T>(
+            std::thread::hardware_concurrency(), widths, strides, idxs, current_ptr);
+        pool.run();
+    }
 
     einstein_expression(T*ptr) :  repeated_num(0), start_ptr(ptr) {}
 
