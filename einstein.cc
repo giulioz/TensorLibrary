@@ -11,7 +11,7 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
 }
 
 // #define SIZE 200
-#define SIZE 20
+#define SIZE 5
 
 /*
   BASELINE:
