@@ -127,7 +127,7 @@ struct index_data {
 };
 
 
-
+// Functor that implements the calculation logic, to be run in parallel
 template<typename T, typename ExpType>
 class parallel_exec {
 public:
@@ -150,9 +150,11 @@ public:
 
         while(!end() && to_run > 0) {
             {
+                // acquire lock for writing on tensor
                 std::lock_guard<std::mutex> write_guard(write_mutex);
                 eval() += x.eval();
             }
+
             next();
             x.next();
             to_run--;
@@ -216,6 +218,7 @@ public:
         size_t elements_per_executor = floor(elements_count / ex_count);
         size_t so_far = 0;
         for (size_t i = 0; i < ex_count; i++) {
+            // avoid rounding errors
             if (i == ex_count - 1) {
                 elements_per_executor = elements_count - so_far;
             }
@@ -239,10 +242,10 @@ public:
     // run the threads and wait for completition
     void run_sync() {
         std::vector<std::thread> threads;
-
         for (auto &&ex : executors) {
             threads.push_back(std::thread(std::ref(ex), std::ref(write_mutex)));
         }
+
         for (auto &&t : threads) {
             t.join();
         }
@@ -251,6 +254,7 @@ public:
 private:
     std::vector<parallel_exec<T,ExpType>> executors;
 
+    // mutex to avoid race conditions on += assignment, protects writing on tensor
     std::mutex write_mutex;
 };
 
@@ -295,12 +299,14 @@ public:
         setup();
         x.setup();
 
+        // OLD SERIAL CODE
         // while(!end()) {
         //     eval() += x.eval();
         //     next();
         //     x.next();
         // }
 
+        // Create a pool of executors and starts them, waiting for finish
         auto pool = executor_pool<T, einstein_expression<T2,dynamic,TYPE2>>(
             std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
         pool.run_sync();
