@@ -141,7 +141,7 @@ public:
         idxs(idxs), current_ptr(current_ptr),
         to_run(to_run), startI(startI), x(x) {}
 
-    void operator()(std::mutex &write_mutex) {
+    void operator() (std::mutex &write_mutex) {
         // align to thread start index
         for (size_t i = 0; i < startI; ++i) {
             next();
@@ -193,7 +193,7 @@ private:
 };
 
 
-// manages and distribute workload over multiple thread of excecution
+// manages and distribute workload over multiple thread of execution
 template<typename T, typename ExpType>
 class executor_pool {
 public:
@@ -259,6 +259,84 @@ private:
 };
 
 
+// fast executor that fills a range with 0s
+template <typename T>
+class parallel_clearer {
+public:
+    parallel_clearer(size_t startI, size_t to_run, T* ptr)
+        : startI(startI), to_run(to_run), ptr(ptr) {}
+    
+    void operator() (){
+        while (to_run > 0) {
+            ptr[startI] = 0;
+
+            to_run--;
+            startI++;
+        }
+    }
+
+private:
+    size_t startI;
+    size_t to_run;
+    T* ptr;
+};
+
+// manages and distribute workload over multiple thread of execution for clearers
+template<typename T>
+class clearer_pool {
+public:
+    clearer_pool(
+        unsigned int ex_count,
+        std::vector<size_t> widths,
+        T* ptr) {
+
+        // calculate the number of items to calculate
+        size_t elements_count = 0;
+        for (size_t i = 0; i < widths.size(); i++) {
+            if (i == 0) {
+                elements_count = widths[i];
+            } else {
+                elements_count *= widths[i];
+            }
+        }
+
+        size_t elements_per_executor = floor(elements_count / ex_count);
+        size_t so_far = 0;
+        for (size_t i = 0; i < ex_count; i++) {
+            // avoid rounding errors
+            if (i == ex_count - 1) {
+                elements_per_executor = elements_count - so_far;
+            }
+
+            executors.push_back(
+                parallel_clearer<T>(
+                    so_far,
+                    elements_per_executor,
+                    ptr
+                )
+            );
+
+            so_far += elements_per_executor;
+        }
+    }
+
+    // run the threads and wait for completition
+    void run_sync() {
+        std::vector<std::thread> threads;
+        for (auto &&ex : executors) {
+            threads.push_back(std::thread(std::ref(ex)));
+        }
+
+        for (auto &&t : threads) {
+            t.join();
+        }
+    }
+
+private:
+    std::vector<parallel_clearer<T>> executors;
+};
+
+
 
 
 /* Proxy class for a tensor with Einstein indices applied
@@ -280,10 +358,16 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
-        while(!end()) {
-            eval()=0;
-            next();
-        }
+
+        // OLD SERIAL CODE
+        // while(!end()) {
+        //     eval()=0;
+        //     next();
+        // }
+
+        // Create a pool of executors and starts them, waiting for finish
+        auto cpool = clearer_pool<T>(std::thread::hardware_concurrency(), widths, current_ptr);
+        cpool.run_sync();
 
         //align index maps + sanity checking
         for (auto i=x_index_map.begin(); i!=x_index_map.end(); ++i) {
