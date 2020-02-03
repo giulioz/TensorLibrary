@@ -10,8 +10,8 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
   return out << id << ' ' << Index_Set<ids...>();
 }
 
-// #define SIZE 200
-#define SIZE 5
+#define SIZE 200
+// #define SIZE 5
 
 /*
   BASELINE:
@@ -29,9 +29,6 @@ int main() {
   size_t count = 0;
   for (auto iter = t1.begin(); iter != t1.end(); ++iter)
     *iter = count++;
-  // for (auto iter = t1.begin(); iter != t1.end(); ++iter)
-  //   std::cout << *iter << ' ';
-  // std::cout << '\n';
 
   auto i = new_index;
   auto j = new_index;
@@ -44,11 +41,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
+    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
   }
 
   tensor<size_t> t3(SIZE, SIZE, SIZE), t4(SIZE);
@@ -65,14 +62,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t3.begin(); iter != t3.end(); ++iter)
+    // for (auto iter = t4.begin(); iter != t4.end(); ++iter)
     //   std::cout << *iter << ' ';
     // std::cout << '\n';
-    for (auto iter = t4.begin(); iter != t4.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
   }
 
   {
@@ -83,11 +77,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
+    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
   }
 
   {
@@ -98,11 +92,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
+    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
   }
 
   {
@@ -113,11 +107,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    for (auto iter = t5.begin(); iter != t5.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
+    // for (auto iter = t5.begin(); iter != t5.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
   }
 
   {
@@ -128,11 +122,11 @@ int main() {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed_time =
         std::chrono::duration<double>(end_time - start_time).count();
-    // std::cout << "elapsed time: " << elapsed_time << '\n';
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    for (auto iter = t6.begin(); iter != t6.end(); ++iter)
-      std::cout << *iter << ' ';
-    std::cout << '\n';
+    // for (auto iter = t6.begin(); iter != t6.end(); ++iter)
+    //   std::cout << *iter << ' ';
+    // std::cout << '\n';
   }
 
   return 0;

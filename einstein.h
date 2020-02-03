@@ -5,6 +5,7 @@
 #include<vector>
 #include<thread>
 #include<cmath>
+#include <mutex>
 
 namespace Tensor {
 /*
@@ -112,7 +113,7 @@ template<unsigned head, unsigned...tail, class U> struct is_same_nonrepeat<Index
 
 
 
-
+// runner that cycles for every item and sets it to 0
 template<typename T, typename ExpType>
 class parallel_clearer {
 public:
@@ -124,16 +125,17 @@ public:
         T* current_ptr)
       : widths(widths), strides(strides),
         idxs(idxs), current_ptr(current_ptr),
-        to_run(to_run) {
+        to_run(to_run), startI(startI) {}
+
+    void operator()(std::mutex &write_mutex) {
+        // align to start position
         while (startI) {
             next();
             startI--;
         }
-    }
 
-    void operator()(std::mutex &write_mutex) {
         while(!end() && to_run > 0) {
-            std::lock_guard<std::mutex> guard(write_mutex);
+            // we don't need a lock since we are initializing to 0
             eval()=0;
             next();
             to_run--;
@@ -160,6 +162,9 @@ private:
         }
     }
 
+    void seek(size_t amount) {
+    }
+
     std::vector<size_t> widths;
     std::vector<size_t> strides;
     std::vector<size_t> idxs;
@@ -167,6 +172,7 @@ private:
     T* current_ptr;
 
     size_t to_run;
+    size_t startI;
 };
 
 template<typename T, typename ExpType>
@@ -180,17 +186,17 @@ public:
         T* current_ptr)
       : widths(widths), strides(strides),
         idxs(idxs), current_ptr(current_ptr),
-        to_run(to_run), x(x) {
+        to_run(to_run), startI(startI), x(x) {}
+
+    void operator()(std::mutex &write_mutex) {
         while (startI) {
             next();
             this->x.next();
             startI--;
         }
-    }
 
-    void operator()(std::mutex &write_mutex) {
         while(!end() && to_run > 0) {
-            std::lock_guard<std::mutex> guard(write_mutex);
+            // std::lock_guard<std::mutex> guard(write_mutex);
             eval() += x.eval();
             next();
             x.next();
@@ -218,6 +224,9 @@ private:
         }
     }
 
+    void seek(size_t amount) {
+    }
+
     std::vector<size_t> widths;
     std::vector<size_t> strides;
     std::vector<size_t> idxs;
@@ -225,6 +234,7 @@ private:
     T* current_ptr;
 
     size_t to_run;
+    size_t startI;
     ExpType x;
 };
 
@@ -273,7 +283,7 @@ public:
         }
     }
 
-    void run() {
+    void run_sync() {
         std::vector<std::thread> threads;
 
         for (auto &&ex : executors) {
@@ -328,11 +338,7 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
-
-        // while(!end()) {
-        //     eval()=0;
-        //     next();
-        // }
+        // set_zeroes<T2, TYPE2>(x);
         set_zeroes_parallel<T2, TYPE2>(x);
 
         //align index maps + sanity checking
@@ -349,11 +355,7 @@ public:
         setup();
         x.setup();
 
-        // while(!end()) {
-        //     eval() += x.eval();
-        //     next();
-        //     x.next();
-        // }
+        // calculate<T2, TYPE2>(x);
         calculate_parallel<T2, TYPE2>(x);
 
         return *this;
@@ -398,17 +400,34 @@ public:
 protected:
 
     template<class T2, class TYPE2>
+    void set_zeroes(einstein_expression<T2,dynamic,TYPE2> x) {
+        while(!end()) {
+            eval()=0;
+            next();
+        }
+    }
+
+    template<class T2, class TYPE2>
+    void calculate(einstein_expression<T2,dynamic,TYPE2> x) {
+        while(!end()) {
+            eval() += x.eval();
+            next();
+            x.next();
+        }
+    }
+
+    template<class T2, class TYPE2>
     void set_zeroes_parallel(einstein_expression<T2,dynamic,TYPE2> x) {
         auto pool = executor_pool<parallel_clearer<T,einstein_expression<T2,dynamic,TYPE2>>, T,einstein_expression<T2,dynamic,TYPE2>>(
             std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
-        pool.run();
+        pool.run_sync();
     }
 
     template<class T2, class TYPE2>
     void calculate_parallel(einstein_expression<T2,dynamic,TYPE2> x) {
         auto pool = executor_pool<parallel_calculator<T,einstein_expression<T2,dynamic,TYPE2>>, T,einstein_expression<T2,dynamic,TYPE2>>(
             std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
-        pool.run();
+        pool.run_sync();
     }
 
     einstein_expression(T*ptr) :  repeated_num(0), start_ptr(ptr) {}
