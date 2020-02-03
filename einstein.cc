@@ -43,9 +43,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   tensor<size_t> t3(SIZE, SIZE, SIZE), t4(SIZE);
@@ -64,9 +64,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t4.begin(); iter != t4.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t4.begin(); iter != t4.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   {
@@ -79,9 +79,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   {
@@ -94,9 +94,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   {
@@ -109,9 +109,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t5.begin(); iter != t5.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t5.begin(); iter != t5.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   {
@@ -124,9 +124,9 @@ int main() {
         std::chrono::duration<double>(end_time - start_time).count();
     std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-    // for (auto iter = t6.begin(); iter != t6.end(); ++iter)
-    //   std::cout << *iter << ' ';
-    // std::cout << '\n';
+    for (auto iter = t6.begin(); iter != t6.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
   }
 
   return 0;

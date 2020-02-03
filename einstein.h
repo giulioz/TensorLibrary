@@ -111,74 +111,27 @@ template<unsigned head, unsigned...tail, class U> struct is_same_nonrepeat<Index
 };
 
 
+struct einstein_proxy;
+template<class T, class U> struct einstein_binary;
+template<class T, class U> struct einstein_multiplication;
+template<class T, class U> struct einstein_addition;
+template<class T, class U> struct einstein_subtraction;
+
+template<typename T, class IDX, class type=einstein_proxy> class einstein_expression;
 
 
-// runner that cycles for every item and sets it to 0
-template<typename T, typename ExpType>
-class parallel_clearer {
-public:
-    parallel_clearer(size_t startI, size_t to_run,
-        ExpType x,
-        std::vector<size_t> widths,
-        std::vector<size_t> strides,
-        std::vector<size_t> idxs,
-        T* current_ptr)
-      : widths(widths), strides(strides),
-        idxs(idxs), current_ptr(current_ptr),
-        to_run(to_run), startI(startI) {}
-
-    void operator()(std::mutex &write_mutex) {
-        // align to start position
-        while (startI) {
-            next();
-            startI--;
-        }
-
-        while(!end() && to_run > 0) {
-            // we don't need a lock since we are initializing to 0
-            eval()=0;
-            next();
-            to_run--;
-        }
-    }
-
-private:
-    bool end() { return idxs[0]==widths[0]; }
-
-    T& eval() { return *current_ptr; }
-
-    void next() {
-        unsigned index = idxs.size()-1;
-        ++idxs[index];
-        current_ptr += strides[index];
-
-        while(idxs[index]==widths[index] && index>0) {
-            idxs[index]=0;
-            current_ptr -= widths[index]*strides[index];
-
-            --index;
-            ++idxs[index];
-            current_ptr += strides[index];
-        }
-    }
-
-    void seek(size_t amount) {
-    }
-
-    std::vector<size_t> widths;
-    std::vector<size_t> strides;
-    std::vector<size_t> idxs;
-
-    T* current_ptr;
-
-    size_t to_run;
-    size_t startI;
+struct index_data {
+    size_t width;
+    size_t stride;
+    bool repeated;
 };
 
+
+
 template<typename T, typename ExpType>
-class parallel_calculator {
+class parallel_exec {
 public:
-    parallel_calculator(size_t startI, size_t to_run,
+    parallel_exec(size_t startI, size_t to_run,
         ExpType x,
         std::vector<size_t> widths,
         std::vector<size_t> strides,
@@ -189,15 +142,17 @@ public:
         to_run(to_run), startI(startI), x(x) {}
 
     void operator()(std::mutex &write_mutex) {
-        while (startI) {
+        // align to thread start index
+        for (size_t i = 0; i < startI; ++i) {
             next();
-            this->x.next();
-            startI--;
+            x.next();
         }
 
         while(!end() && to_run > 0) {
-            // std::lock_guard<std::mutex> guard(write_mutex);
-            eval() += x.eval();
+            {
+                std::lock_guard<std::mutex> write_guard(write_mutex);
+                eval() += x.eval();
+            }
             next();
             x.next();
             to_run--;
@@ -224,9 +179,6 @@ private:
         }
     }
 
-    void seek(size_t amount) {
-    }
-
     std::vector<size_t> widths;
     std::vector<size_t> strides;
     std::vector<size_t> idxs;
@@ -239,8 +191,8 @@ private:
 };
 
 
-
-template<typename ExecutorType, typename T, typename ExpType>
+// manages and distribute workload over multiple thread of excecution
+template<typename T, typename ExpType>
 class executor_pool {
 public:
     executor_pool(
@@ -251,6 +203,7 @@ public:
         std::vector<size_t> idxs,
         T* current_ptr) {
 
+        // calculate the number of items to calculate
         size_t elements_count = 0;
         for (size_t i = 0; i < widths.size(); i++) {
             if (i == 0) {
@@ -268,7 +221,7 @@ public:
             }
 
             executors.push_back(
-                ExecutorType(
+                parallel_exec<T,ExpType>(
                     so_far,
                     elements_per_executor,
                     x,
@@ -283,6 +236,7 @@ public:
         }
     }
 
+    // run the threads and wait for completition
     void run_sync() {
         std::vector<std::thread> threads;
 
@@ -295,29 +249,13 @@ public:
     }
 
 private:
-    std::vector<ExecutorType> executors;
+    std::vector<parallel_exec<T,ExpType>> executors;
 
     std::mutex write_mutex;
 };
 
 
 
-
-
-struct einstein_proxy;
-template<class T, class U> struct einstein_binary;
-template<class T, class U> struct einstein_multiplication;
-template<class T, class U> struct einstein_addition;
-template<class T, class U> struct einstein_subtraction;
-
-template<typename T, class IDX, class type=einstein_proxy> class einstein_expression;
-
-
-struct index_data {
-    size_t width;
-    size_t stride;
-    bool repeated;
-};
 
 /* Proxy class for a tensor with Einstein indices applied
  * can be both l-value and r-value. operator = triggers evaluation and accumulation
@@ -338,8 +276,10 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
-        // set_zeroes<T2, TYPE2>(x);
-        set_zeroes_parallel<T2, TYPE2>(x);
+        while(!end()) {
+            eval()=0;
+            next();
+        }
 
         //align index maps + sanity checking
         for (auto i=x_index_map.begin(); i!=x_index_map.end(); ++i) {
@@ -355,8 +295,15 @@ public:
         setup();
         x.setup();
 
-        // calculate<T2, TYPE2>(x);
-        calculate_parallel<T2, TYPE2>(x);
+        // while(!end()) {
+        //     eval() += x.eval();
+        //     next();
+        //     x.next();
+        // }
+
+        auto pool = executor_pool<T, einstein_expression<T2,dynamic,TYPE2>>(
+            std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
+        pool.run_sync();
 
         return *this;
     }
@@ -395,40 +342,9 @@ public:
 
     template<typename T2, class type2> friend class tensor;
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
-    template<typename, typename> friend class parallel_calculator;
+    template<typename, typename> friend class parallel_exec;
 
 protected:
-
-    template<class T2, class TYPE2>
-    void set_zeroes(einstein_expression<T2,dynamic,TYPE2> x) {
-        while(!end()) {
-            eval()=0;
-            next();
-        }
-    }
-
-    template<class T2, class TYPE2>
-    void calculate(einstein_expression<T2,dynamic,TYPE2> x) {
-        while(!end()) {
-            eval() += x.eval();
-            next();
-            x.next();
-        }
-    }
-
-    template<class T2, class TYPE2>
-    void set_zeroes_parallel(einstein_expression<T2,dynamic,TYPE2> x) {
-        auto pool = executor_pool<parallel_clearer<T,einstein_expression<T2,dynamic,TYPE2>>, T,einstein_expression<T2,dynamic,TYPE2>>(
-            std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
-        pool.run_sync();
-    }
-
-    template<class T2, class TYPE2>
-    void calculate_parallel(einstein_expression<T2,dynamic,TYPE2> x) {
-        auto pool = executor_pool<parallel_calculator<T,einstein_expression<T2,dynamic,TYPE2>>, T,einstein_expression<T2,dynamic,TYPE2>>(
-            std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
-        pool.run_sync();
-    }
 
     einstein_expression(T*ptr) :  repeated_num(0), start_ptr(ptr) {}
 
@@ -555,7 +471,7 @@ public:
 
 
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
-    template<typename, typename> friend class parallel_calculator;
+    template<typename, typename> friend class parallel_exec;
 
 protected:
     void add_index(Index idx, unsigned width, unsigned stride=0) {
@@ -674,7 +590,7 @@ public:
     }
 
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
-    template<typename, typename> friend class parallel_calculator;
+    template<typename, typename> friend class parallel_exec;
 
 protected:
     void add_index(Index idx, unsigned width, unsigned stride=0) {
@@ -765,7 +681,7 @@ public:
     }
 
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
-    template<typename, typename> friend class parallel_calculator;
+    template<typename, typename> friend class parallel_exec;
 
 protected:
 
@@ -791,7 +707,7 @@ public:
     }
 
     template<typename T2, class IDX2, class type2> friend class einstein_expression;
-    template<typename, typename> friend class parallel_calculator;
+    template<typename, typename> friend class parallel_exec;
 
 protected:
 
