@@ -162,35 +162,5 @@ int main() {
   }
   #endif
 
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
-
-  //   tensor<size_t, rank<2>> t5 = t1(i, j);
-
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   double elapsed_time =
-  //       std::chrono::duration<double>(end_time - start_time).count();
-  //   std::cerr << "elapsed time: " << elapsed_time << '\n';
-
-  //   for (auto iter = t5.begin(); iter != t5.end(); ++iter)
-  //     std::cout << *iter << ' ';
-  //   std::cout << '\n';
-  // }
-
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
-
-  //   tensor<size_t, rank<2>> t6 = t3(i, j, k) * t4(j);
-
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   double elapsed_time =
-  //       std::chrono::duration<double>(end_time - start_time).count();
-  //   std::cerr << "elapsed time: " << elapsed_time << '\n';
-
-  //   for (auto iter = t6.begin(); iter != t6.end(); ++iter)
-  //     std::cout << *iter << ' ';
-  //   std::cout << '\n';
-  // }
-
   return 0;
 }
