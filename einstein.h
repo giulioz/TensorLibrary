@@ -205,6 +205,8 @@ public:
         std::vector<size_t> idxs,
         T* current_ptr) {
 
+        // TODO: se è piccolo non fare multithreading
+
         // calculate the number of items to calculate
         size_t elements_count = 0;
         for (size_t i = 0; i < widths.size(); i++) {
@@ -218,7 +220,7 @@ public:
         size_t elements_per_executor = floor(elements_count / ex_count);
         size_t so_far = 0;
         for (size_t i = 0; i < ex_count; i++) {
-            // avoid rounding errors
+            // avoid rounding off-by-one errors
             if (i == ex_count - 1) {
                 elements_per_executor = elements_count - so_far;
             }
@@ -358,15 +360,47 @@ public:
 
         // set all entries of dest tensor to 0
         setup();
+        while(!end()) {
+            eval()=0;
+            next();
+        }
 
-        // OLD SERIAL CODE
-        // while(!end()) {
-        //     eval()=0;
-        //     next();
-        // }
+        //align index maps + sanity checking
+        for (auto i=x_index_map.begin(); i!=x_index_map.end(); ++i) {
+            auto j=index_map.find(i->first);
+            if (i->second.repeated) {
+                assert(j==index_map.end());
+                add_index(i->first, i->second.width);
+            } else {
+                assert(j!=index_map.end());
+            }
+        }
+        assert(index_map.size()==x_index_map.size());
+        setup();
+        x.setup();
+
+        while(!end()) {
+            eval() += x.eval();
+            next();
+            x.next();
+        }
+
+        return *this;
+    }
+
+    // assignment, parallel version
+    template<class T2, class TYPE2>
+    einstein_expression<T,dynamic>& assign_parallel(
+        einstein_expression<T2,dynamic,TYPE2>&& x, int n_threads = std::thread::hardware_concurrency()) {
+
+        std::map<Index,index_data>& x_index_map=x.get_index_map();
+        assert(repeated_num==0);
+
+        // set all entries of dest tensor to 0
+        setup();
 
         // Create a pool of executors and starts them, waiting for finish
-        auto cpool = clearer_pool<T>(std::thread::hardware_concurrency(), widths, current_ptr);
+        auto cpool = clearer_pool<T>(n_threads, widths, current_ptr);
         cpool.run_sync();
 
         //align index maps + sanity checking
@@ -383,16 +417,9 @@ public:
         setup();
         x.setup();
 
-        // OLD SERIAL CODE
-        // while(!end()) {
-        //     eval() += x.eval();
-        //     next();
-        //     x.next();
-        // }
-
         // Create a pool of executors and starts them, waiting for finish
         auto pool = executor_pool<T, einstein_expression<T2,dynamic,TYPE2>>(
-            std::thread::hardware_concurrency(), x, widths, strides, idxs, current_ptr);
+            n_threads, x, widths, strides, idxs, current_ptr);
         pool.run_sync();
 
         return *this;
@@ -822,6 +849,15 @@ public:
         static_assert(is_same_nonrepeat<Index_Set<ids...>,typename non_repeat<Index_Set<ids...>>::set>::value, "Repeated indices in lvalue Einstein expression");
         static_assert(is_same_nonrepeat<Index_Set<ids...>, typename non_repeat<Index_Set<ids2...>>::set>::value, "Non-repeated indices in lvalue and rvalue Einstein expressions are not the same");
         einstein_expression<T,dynamic,einstein_proxy>::operator = (static_cast<einstein_expression<T2,dynamic,TYPE2>&&>(x));
+        return *this;
+    }
+
+    template<class T2, class TYPE2, unsigned...ids2>
+    einstein_expression<T,Index_Set<ids...>,einstein_proxy>& assign_parallel(
+        einstein_expression<T2,Index_Set<ids2...>,TYPE2>&& x, int n_threads = std::thread::hardware_concurrency()) {
+        static_assert(is_same_nonrepeat<Index_Set<ids...>,typename non_repeat<Index_Set<ids...>>::set>::value, "Repeated indices in lvalue Einstein expression");
+        static_assert(is_same_nonrepeat<Index_Set<ids...>, typename non_repeat<Index_Set<ids2...>>::set>::value, "Non-repeated indices in lvalue and rvalue Einstein expressions are not the same");
+        einstein_expression<T,dynamic,einstein_proxy>::assign_parallel (static_cast<einstein_expression<T2,dynamic,TYPE2>&&>(x), n_threads);
         return *this;
     }
 };
