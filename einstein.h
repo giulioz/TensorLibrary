@@ -468,38 +468,23 @@ protected:
 
     // go to position
     void seek(size_t pos) {
-        while (pos > 0) {
-            next();
-            pos--;
+        unsigned index = idxs.size()-1;
+        idxs[index] += pos;
+        current_ptr += strides[index] * pos;
+
+        while(idxs[index]>=widths[index] && index>0) {
+            size_t times = 0;
+
+            while(idxs[index]>=widths[index]) {
+                idxs[index] -= widths[index];
+                current_ptr -= widths[index] * strides[index];
+                times++;
+            }
+
+            --index;
+            idxs[index] += times;
+            current_ptr += times * strides[index];
         }
-
-        // std::vector<size_t> idxs_temp = idxs;
-        // for (int i = widths.size() - 1; i >= 0; i--) {
-        //     idxs_temp[i] = pos % widths[i];
-        //     pos /= widths[i];
-        // }
-
-        // for (int i = widths.size() - 1; i >= 0; i--) {
-        //     current_ptr += strides[i] * idxs_temp[i];
-        // }
-
-        // unsigned index = idxs.size()-1;
-        // idxs[index] += pos;
-        // current_ptr += strides[index] * pos;
-
-        // while(idxs[index]>=widths[index] && index>0) {
-        //     size_t times = 0;
-
-        //     while(idxs[index]>=widths[index]) {
-        //         idxs[index] -= widths[index];
-        //         current_ptr -= widths[index]*strides[index];
-        //         times++;
-        //     }
-
-        //     --index;
-        //     idxs[index] += times;
-        //     current_ptr += times * strides[index];
-        // }
     }
 
     void add_index(Index idx, unsigned width, unsigned stride=0) {

@@ -10,7 +10,9 @@ std::ostream &operator<<(std::ostream &out, Index_Set<id, ids...>) {
   return out << id << ' ' << Index_Set<ids...>();
 }
 
-#define SIZE 200
+#define SIZE 300
+#define SERIAL
+#define PARALLEL
 
 int main() {
   tensor<size_t, rank<2>> t1(SIZE, SIZE), t2(SIZE, SIZE);
@@ -22,20 +24,23 @@ int main() {
   auto i = new_index;
   auto j = new_index;
 
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
+  #ifdef SERIAL
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
 
-  //   t2(j, i) = t1(i, j);
+    t2(j, i) = t1(i, j);
 
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   double elapsed_time =
-  //       std::chrono::duration<double>(end_time - start_time).count();
-  //   std::cerr << "elapsed time: " << elapsed_time << '\n';
+    auto end_time = std::chrono::high_resolution_clock::now();
+    double elapsed_time =
+        std::chrono::duration<double>(end_time - start_time).count();
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-  //   for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //     std::cout << *iter << ' ';
-  //   std::cout << '\n';
-  // }
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
+  #endif
+  #ifdef PARALLEL
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -50,6 +55,7 @@ int main() {
       std::cout << *iter << ' ';
     std::cout << '\n';
   }
+  #endif
 
   tensor<size_t> t3(SIZE, SIZE, SIZE), t4(SIZE);
   auto k = new_index;
@@ -57,6 +63,7 @@ int main() {
   for (auto iter = t3.begin(); iter != t3.end(); ++iter)
     *iter = count++;
 
+  #ifdef SERIAL
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -71,6 +78,8 @@ int main() {
       std::cout << *iter << ' ';
     std::cout << '\n';
   }
+  #endif
+  #ifdef PARALLEL
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -85,21 +94,25 @@ int main() {
       std::cout << *iter << ' ';
     std::cout << '\n';
   }
+  #endif
 
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
+  #ifdef SERIAL
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
 
-  //   t2(i, j) = t1(i, k) * t1(k, j);
+    t2(i, j) = t1(i, k) * t1(k, j);
 
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   double elapsed_time =
-  //       std::chrono::duration<double>(end_time - start_time).count();
-  //   std::cerr << "elapsed time: " << elapsed_time << '\n';
+    auto end_time = std::chrono::high_resolution_clock::now();
+    double elapsed_time =
+        std::chrono::duration<double>(end_time - start_time).count();
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-  //   for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //     std::cout << *iter << ' ';
-  //   std::cout << '\n';
-  // }
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
+  #endif
+  #ifdef PARALLEL
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -114,21 +127,25 @@ int main() {
       std::cout << *iter << ' ';
     std::cout << '\n';
   }
+  #endif
 
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
+  #ifdef SERIAL
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
 
-  //   t2(i, k) = t3(i, j, j) * t4(k);
+    t2(i, k) = t3(i, j, j) * t4(k);
 
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   double elapsed_time =
-  //       std::chrono::duration<double>(end_time - start_time).count();
-  //   std::cerr << "elapsed time: " << elapsed_time << '\n';
+    auto end_time = std::chrono::high_resolution_clock::now();
+    double elapsed_time =
+        std::chrono::duration<double>(end_time - start_time).count();
+    std::cerr << "elapsed time: " << elapsed_time << '\n';
 
-  //   for (auto iter = t2.begin(); iter != t2.end(); ++iter)
-  //     std::cout << *iter << ' ';
-  //   std::cout << '\n';
-  // }
+    for (auto iter = t2.begin(); iter != t2.end(); ++iter)
+      std::cout << *iter << ' ';
+    std::cout << '\n';
+  }
+  #endif
+  #ifdef PARALLEL
   {
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -143,6 +160,7 @@ int main() {
       std::cout << *iter << ' ';
     std::cout << '\n';
   }
+  #endif
 
   // {
   //   auto start_time = std::chrono::high_resolution_clock::now();
