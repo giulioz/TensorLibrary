@@ -76,6 +76,7 @@
         "queue": "cpp",
         "stack": "cpp",
         "thread": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "filesystem": "cpp"
     }
 }
