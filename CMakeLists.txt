@@ -3,6 +3,8 @@ project(tensor-library)
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(Threads)
+
 add_compile_options(
   "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-g3"
 )
