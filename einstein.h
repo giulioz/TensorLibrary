@@ -127,7 +127,7 @@ struct index_data {
 };
 
 
-// Functor that implements the calculation logic, to be run in parallel
+// Functor that implements the calculation logic, to be ran in parallel
 template<typename ExpTypeA, typename ExpTypeB>
 class parallel_exec {
 public:
@@ -159,12 +159,14 @@ public:
 private:
     size_t to_run;
     size_t startI;
+
+    // Copy of expression left and right side
     ExpTypeA exp;
     ExpTypeB x;
 };
 
 
-// manages and distribute workload over multiple thread of execution
+// Manages and distribute workload over multiple thread of execution
 template<typename ExpTypeA, typename ExpTypeB>
 class executor_pool {
 public:
